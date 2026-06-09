@@ -1,0 +1,23 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# This project intentionally does NOT hard-wrap Markdown prose — line
+# wrapping is left to the editor. Don't impose a maximum line length.
+max_line_length = off
+# Two trailing spaces are a significant line break in Markdown, so don't
+# strip trailing whitespace in Markdown files.
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4
+
+[Makefile]
+indent_style = tab

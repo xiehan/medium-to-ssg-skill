@@ -1,0 +1,28 @@
+name: Skill improvement or new guidance
+description: Suggest an enhancement, new step, or new branch for a skill.
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which skill or area?
+      options:
+        - medium-to-ssg
+        - medium-publication-export
+        - Repo tooling / CI
+        - New skill
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to add or change?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this useful?
+      description: What problem does it solve, or what migration scenario does it cover?
+    validations:
+      required: true

@@ -1,0 +1,28 @@
+{
+  // This project writes documentation in a deliberate "prose-first" house
+  // style. The rules disabled below are stylistic and conflict with that
+  // style on purpose; everything else (broken/reversed link syntax, heading
+  // levels, multiple top-level headings, missing final newline, bare URLs,
+  // stray blank lines, etc.) stays enforced. See CONTRIBUTING.md.
+
+  // Prose is intentionally not hard-wrapped; wrapping is left to the editor.
+  // https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md
+  "MD013": false,
+
+  // Compact Markdown tables (no surrounding padding spaces) are used
+  // throughout the docs.
+  "MD060": false,
+
+  // Many fenced blocks are directory trees, console output, or DNS records
+  // that read better without an artificial language tag.
+  "MD040": false,
+
+  // Dense reference docs sometimes place fenced blocks and lists tight
+  // against the surrounding lines.
+  "MD031": false,
+  "MD032": false,
+
+  // Multi-paragraph blockquotes (paragraphs separated by a blank line) are
+  // used for multi-part notes.
+  "MD028": false
+}

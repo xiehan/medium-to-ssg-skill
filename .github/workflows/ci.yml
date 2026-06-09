@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  skill-lint:
+    name: Skill structure & links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Validate skill frontmatter and cross-reference links
+        run: python3 tools/lint_skills.py
+
+  markdownlint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Lint Markdown
+        run: npx --yes markdownlint-cli2@0.22.1 "**/*.md"
+
+  scripts:
+    name: Python helpers compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Byte-compile Python helpers
+        run: |
+          python3 -m py_compile \
+            tools/lint_skills.py \
+            .agents/skills/medium-to-ssg/scripts/convert_medium.py \
+            .agents/skills/medium-publication-export/scripts/scrape_publication.py

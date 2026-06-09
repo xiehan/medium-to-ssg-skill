@@ -1,0 +1,41 @@
+name: Skill bug or inaccuracy
+description: Report something wrong, broken, or out of date in a skill or its docs.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve these skills! Please describe the problem as specifically as you can.
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill?
+      options:
+        - medium-to-ssg
+        - medium-publication-export
+        - Repo tooling / CI
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong?
+      description: What did the skill or its docs say or do, and why is it incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: >-
+        Hosting path (AWS / GitHub Pages), infra method (Terraform / AWS CLI),
+        personal vs. publication export, OS, Hugo version — anything relevant.
+    validations:
+      required: false

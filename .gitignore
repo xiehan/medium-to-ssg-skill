@@ -1,0 +1,66 @@
+# .gitignore for the medium-to-ssg-skill repository
+#
+# This repo contains the skills themselves, not a generated site. The entries
+# below exist so that a contributor who clones/forks this repo and *runs* a
+# skill to test it (or reproduce a bug) doesn't accidentally commit the files
+# those skills generate. Everything tracked in the repo today is hand-authored
+# under .agents/, tools/, .github/, plus the root docs — none of which match
+# these patterns.
+
+# --- medium-to-ssg: progress + working files -------------------------------
+# The agent's resumable status file (created in the working directory).
+migration-status.md
+# Where the user's Medium export ZIP is unzipped while testing.
+work/
+
+# --- medium-to-ssg: generated Hugo site ------------------------------------
+# A test run scaffolds a Hugo project; these are its build/cache artifacts.
+public/
+resources/
+.hugo_build.lock
+hugo_stats.json
+# Hugo themes are pulled in as a submodule or clone, not committed here.
+themes/
+
+# --- medium-to-ssg: generated infrastructure (AWS paths) -------------------
+# Terraform state is sensitive and machine-local; never commit it.
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+.terraform/
+.terraform.tfstate.lock.info
+# Local Terraform CLI config / credentials.
+.terraformrc
+terraform.rc
+# AWS CLI path: a test run may drop credentials/output files here.
+*.pem
+
+# --- medium-publication-export: scraper output -----------------------------
+# Default output directory: urls.txt, posts/, inbox/, manifest.csv, the ZIP.
+medium-export-out/
+urls.txt
+
+# --- Python (helper scripts) -----------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node (markdownlint runs via npx; lockless, but be safe) ---------------
+node_modules/
+
+# --- OS / editor noise -----------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
