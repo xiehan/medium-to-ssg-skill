@@ -202,6 +202,19 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         out = cm.convert_post(fn, "my-post")
         self.assertIn("date: 2019-09-04", out)
 
+    def test_draft_export_raises_clear_error(self):
+        # Personal exports name unpublished drafts `draft_*.html`; they have no
+        # dt-published date. convert_post must reject them with a message that
+        # names the draft, not a cryptic parse error.
+        fn = "draft_How-To-Do-X-f82aa957032e.html"
+        with open(os.path.join(self.tmp, fn), "w", encoding="utf-8") as f:
+            f.write("<html><head><title>Draft</title></head>"
+                    "<body><section data-field=\"body\">x</section></body></html>")
+        with self.assertRaises(ValueError) as ctx:
+            cm.convert_post(fn, "how-to-do-x")
+        self.assertIn(fn, str(ctx.exception))
+        self.assertIn("draft", str(ctx.exception).lower())
+
     def test_alias_preserves_medium_slug(self):
         fn = write_export(self.tmp, "post.html")
         out = cm.convert_post(fn, "my-post")

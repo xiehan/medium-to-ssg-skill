@@ -22,6 +22,8 @@ List all files in `posts/` and cross-reference against any inventory the user pr
 2. Present the full list to the user
 3. Ask them to confirm which posts belong to their blog (vs. responses, contributions to other pubs, etc.)
 
+> **Skip drafts.** Medium's personal export names unpublished drafts `draft_<Title>-<hash>.html`. Draft files have no `<time class="dt-published">` element, so they are not published posts and the converter in Part 2 will reject them (it raises an error naming the draft). Exclude every `draft_`-prefixed file when building the inventory and the `posts` list below.
+
 ### Step 3 — Build the post inventory
 
 Create a table with these columns and confirm it with the user before proceeding to Part 2:

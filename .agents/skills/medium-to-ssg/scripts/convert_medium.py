@@ -506,6 +506,14 @@ def convert_post(html_filename, clean_slug):
 
     time_tag = soup.find("time", class_="dt-published")
     if not time_tag:
+        # Medium's personal export names unpublished drafts `draft_*.html`, and
+        # those pages carry no publish date. Surface that clearly instead of a
+        # cryptic parse error so the fix (drop drafts from `posts`) is obvious.
+        if os.path.basename(html_filename).startswith("draft_"):
+            raise ValueError(
+                f"{html_filename} is an unpublished Medium draft (no publish "
+                f"date); remove it from the `posts` list."
+            )
         raise ValueError(f"No dt-published time tag found in {html_filename}")
     raw_date = time_tag["datetime"]  # e.g. "2024-01-15T10:30:00.000Z"
     date = datetime.fromisoformat(raw_date.replace("Z", "+00:00")).strftime("%Y-%m-%d")
