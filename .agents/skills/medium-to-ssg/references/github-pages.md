@@ -60,9 +60,11 @@ example.com
 
 > Note: GitHub also writes this file automatically when you set the custom domain in the repo UI. Committing it in `static/CNAME` keeps it from being wiped on each Actions deploy, which is the recommended approach when deploying via GitHub Actions.
 
-### 4. Theme submodule
+### 4. Theme submodule or module
 
 If the chosen theme is added as a git submodule, ensure `.gitmodules` is committed. The deploy workflow checks out submodules so the theme is present at build time.
+
+If the theme is instead installed as a **Hugo Module** (a `[module]` import with `go.mod`/`go.sum` and no `themes/` submodule), commit `go.mod` and `go.sum`, and add an `actions/setup-go` step to the deploy workflow before the build so Hugo can fetch the module (see the module note in `references/cicd.md`).
 
 ---
 

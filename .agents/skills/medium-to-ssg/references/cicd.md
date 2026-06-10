@@ -106,7 +106,17 @@ jobs:
             --paths "/*"
 ```
 
-**Note on `submodules: recursive`**: This is required to pull in the Hugo theme. Without it, the `themes/` directory will be empty and `hugo --minify` will fail.
+**Note on `submodules: recursive`**: This is required to pull in the Hugo theme when it is installed as a git submodule. Without it, the `themes/` directory will be empty and `hugo --minify` will fail.
+
+**Note for Hugo Module themes**: If the theme is installed as a Hugo Module (a `[module]` import in config with `go.mod`/`go.sum`, no `themes/` submodule) instead of a submodule, add a Go setup step **before** the build so Hugo can fetch the module from its cache:
+
+```yaml
+      - uses: actions/setup-go@SHA_HERE  # vX.Y.Z
+        with:
+          go-version: "stable"
+```
+
+The `submodules: recursive` checkout option is harmless but unnecessary on this path.
 
 **Note on Hugo version**: The version string in the workflow must match the user's local Hugo version to avoid build differences. Ask the user to run `hugo version` locally and use that exact version number.
 
