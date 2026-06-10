@@ -37,6 +37,12 @@ Raw HTML in prose: angle brackets that appear as text in a post (e.g. a literal
 renderer (which drops raw HTML by default) shows them instead of silently
 omitting the text. Inline code and fenced code blocks are kept verbatim.
 
+Link targets: Medium occasionally mangles a URL the author wrapped in
+parentheses into an invalid target like "http://%28https://example.com" (the
+"(" becomes "%28"). Most themes ignore a bad href, but strict ones whose
+render-link hooks call urls.Parse (e.g. DoIt) abort the whole build on it, so
+this recoverable wrapper is unwrapped back to the real URL.
+
 Requires: beautifulsoup4 (pip install beautifulsoup4)
           (image downloading uses only the Python standard library)
 """
@@ -324,6 +330,31 @@ def _wrap_inline(inner, prefix, suffix):
     return f"{lead}{prefix}{core}{suffix}{trail}"
 
 
+# A URL the author wrapped in parentheses before pasting (e.g. typing
+# "(https://example.com)") can be mangled by Medium into a single link target
+# of the form "http://%28https://example.com" — the "(" is absorbed into the
+# scheme as "%28". Such a target is an invalid URL: most themes ignore it, but
+# strict ones whose render-link hooks call urls.Parse (e.g. DoIt) abort the
+# whole build on it. This pattern matches the recoverable wrapper.
+_MANGLED_PAREN_URL_RE = re.compile(r"^https?://%28(https?://.+)$", re.IGNORECASE)
+
+
+def _clean_href(href):
+    """Repair the recoverable malformed link targets emitted by Medium.
+
+    Returns the unwrapped inner URL for the ``scheme://%28<real-url>`` artifact
+    (dropping a matching trailing ``%29`` if present); any other href is
+    returned unchanged.
+    """
+    match = _MANGLED_PAREN_URL_RE.match(href)
+    if not match:
+        return href
+    inner = match.group(1)
+    if inner.endswith("%29"):
+        inner = inner[:-3]
+    return inner
+
+
 def _escape_md_text(text):
     """Escape characters that would otherwise be parsed as raw HTML.
 
@@ -388,7 +419,7 @@ def node_to_md(node):
         return _wrap_inline(inner, "*", "*")
     if tag == "a":
         inner = "".join(node_to_md(c) for c in node.children)
-        href = node.get("href", "")
+        href = _clean_href(node.get("href", ""))
         if not inner.strip():
             return ""
         lead, core, trail = _split_edge_ws(inner)
