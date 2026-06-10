@@ -307,7 +307,14 @@ def discover_urls_from_sitemap(session, site, delay):
 # ── Metadata + body extraction ───────────────────────────────────────────────
 
 def _ld_json_article(soup):
-    """Find the Article-like JSON-LD block, if present."""
+    """Find the Article-like JSON-LD block, if present.
+
+    Medium tags its post JSON-LD with ``@type: "SocialMediaPosting"`` (schema.org
+    parlance for a published story), so that type must be recognized too — without
+    it the block is skipped and date/author extraction silently falls back to the
+    ``article:published_time`` meta, which Medium sets to the *latest* publish time
+    (i.e. the last-edited date), not the original ``datePublished``.
+    """
     for tag in soup.find_all("script", type="application/ld+json"):
         try:
             data = json.loads(tag.string or "")
@@ -315,7 +322,7 @@ def _ld_json_article(soup):
             continue
         for obj in data if isinstance(data, list) else [data]:
             if isinstance(obj, dict) and obj.get("@type") in (
-                "Article", "NewsArticle", "BlogPosting",
+                "Article", "NewsArticle", "BlogPosting", "SocialMediaPosting",
             ):
                 return obj
     return None
