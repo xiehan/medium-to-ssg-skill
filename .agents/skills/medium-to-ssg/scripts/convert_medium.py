@@ -338,6 +338,40 @@ def _escape_md_text(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _text_with_breaks(node):
+    """Get a node's text with ``<br>`` elements rendered as newlines.
+
+    ``BeautifulSoup.get_text()`` drops ``<br>`` entirely, which collapses the
+    lines of a Medium code block onto one another. Code is emitted verbatim
+    (no entity escaping) so it stays literal inside the fence.
+    """
+    parts = []
+    for child in node.children:
+        if isinstance(child, str):
+            parts.append(child)
+        elif child.name == "br":
+            parts.append("\n")
+        else:
+            parts.append(_text_with_breaks(child))
+    return "".join(parts)
+
+
+def _pre_text(node):
+    """Extract the text of a ``<pre>`` block, preserving line breaks.
+
+    Medium stores code lines delimited by ``<br>`` inside one or more ``<span>``
+    line-group elements. Both the ``<br>`` delimiters and the boundaries between
+    those line groups need to become newlines, otherwise the whole block
+    collapses to a single line.
+    """
+    groups = node.find_all(["span", "div"], recursive=False)
+    if groups:
+        text = "\n".join(_text_with_breaks(g) for g in groups)
+    else:
+        text = _text_with_breaks(node)
+    return text.strip("\n")
+
+
 def node_to_md(node):
     """Recursively convert a BeautifulSoup node to Markdown text."""
     if isinstance(node, str):
@@ -391,8 +425,12 @@ def node_to_md(node):
         lines = inner.split("\n")
         return "\n\n" + "\n".join(f"> {line}" for line in lines) + "\n\n"
     if tag == "pre":
-        inner = node.get_text()
-        return f"\n\n```\n{inner}\n```\n\n"
+        inner = _pre_text(node)
+        # Fence with enough backticks to safely wrap content that itself
+        # contains a backtick run (e.g. a code block that quotes Markdown).
+        longest = max((len(m) for m in re.findall(r"`+", inner)), default=0)
+        fence = "`" * max(3, longest + 1)
+        return f"\n\n{fence}\n{inner}\n{fence}\n\n"
     if tag == "hr":
         return "\n\n---\n\n"
 
