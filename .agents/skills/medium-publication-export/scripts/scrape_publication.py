@@ -44,10 +44,17 @@ Preserving old URLs when the custom domain is gone:
 Package the ZIP once posts/ is complete:
        python3 scrape_publication.py --package
 
+Review and prune topic tags before packaging (tags come from the live page;
+see references/export-format.md):
+       python3 scrape_publication.py --tags-report          # list tags + counts
+       python3 scrape_publication.py --prune-tags "NPR,Misc" # drop named tags
+       python3 scrape_publication.py --min-tag-count 2       # drop one-off tags
+
 Output (under --out, default ./medium-export-out):
   urls.txt                          enumerated post URLs
   posts/<YYYY-MM-DD>_<slug>.html    one per post, export format
   manifest.csv                      inventory (date, author, url, file)
+  tags.csv                          tag inventory with post counts (--tags-report)
   medium-publication-export.zip     zipped posts/ -- feed this to medium-to-ssg
 
 Resumable: posts already written to posts/ are skipped.
@@ -319,6 +326,64 @@ def _meta(soup, **attrs):
     return tag.get("content", "").strip() if tag else ""
 
 
+def extract_tags(soup):
+    """Return the post's topic tags in display form (best-effort, ordered).
+
+    Live Medium pages expose tags two ways: as "Topic:" pill buttons at the
+    foot of the article (an ``aria-label="Topic: <name>"`` on each) and inside
+    the embedded Apollo cache (``"Tag:<slug>"`` objects carrying a
+    ``displayTitle``). The pill buttons belong specifically to this post, so we
+    prefer them; the Apollo cache is a reliable fallback (and is what bookmarklet
+    captures or fetches without rendered pills still contain), followed by
+    ld+json / ``<meta>`` keywords. Personal "Download your information" exports
+    carry no tags, so this returns ``[]`` for them.
+    """
+    seen = set()
+    tags = []
+
+    def add(name):
+        name = re.sub(r"\s+", " ", html.unescape(name or "")).strip()
+        key = name.lower()
+        if name and key not in seen:
+            seen.add(key)
+            tags.append(name)
+
+    # 1) Topic pill buttons (most precise — specific to this post).
+    topic_re = re.compile(r"^\s*Topic:\s*", re.IGNORECASE)
+    for el in soup.find_all(attrs={"aria-label": topic_re}):
+        add(topic_re.sub("", el.get("aria-label", "")))
+
+    # 2) Apollo cache Tag objects ("Tag:<slug>": { ... "displayTitle": "..." }).
+    if not tags:
+        for script in soup.find_all("script"):
+            text = script.get_text() or ""
+            if '"Tag:' not in text:
+                continue
+            for m in re.finditer(
+                r'"Tag:[^"]+":\{[\s\S]{0,500}?"displayTitle":"([^"\\]+)"',
+                text,
+            ):
+                add(m.group(1))
+            if tags:
+                break
+
+    # 3) ld+json / <meta> keywords (comma-separated).
+    if not tags:
+        ld = _ld_json_article(soup) or {}
+        kw = ld.get("keywords")
+        if isinstance(kw, list):
+            for k in kw:
+                add(str(k))
+        elif isinstance(kw, str):
+            for k in kw.split(","):
+                add(k)
+        if not tags:
+            for k in _meta(soup, name="keywords").split(","):
+                add(k)
+
+    return tags
+
+
 def extract_metadata(soup, source_url):
     """Pull title, ISO date, author, and canonical URL from a post page."""
     ld = _ld_json_article(soup) or {}
@@ -365,6 +430,7 @@ def extract_metadata(soup, source_url):
         "date_iso": date_iso,
         "author": author,
         "canonical": canonical,
+        "tags": extract_tags(soup),
     }
 
 
@@ -474,6 +540,15 @@ def build_export_html(meta, body_html):
             f'  <p class="p-author">By '
             f'<a class="p-author h-card" href="">{author}</a></p>\n'
         )
+    tags_block = ""
+    if meta.get("tags"):
+        # h-entry microformat: one <a class="p-category"> per tag. The
+        # converter reads these into the Hugo front matter's `tags:` list.
+        links = "".join(
+            f'<a class="p-category" href="">{html.escape(t)}</a>'
+            for t in meta["tags"]
+        )
+        tags_block = f'    <p class="tags">{links}</p>\n'
     return (
         "<!DOCTYPE html>\n<html>\n<head>\n"
         '  <meta charset="utf-8">\n'
@@ -489,6 +564,7 @@ def build_export_html(meta, body_html):
         f'    <time class="dt-published" datetime="{html.escape(meta["date_iso"])}">'
         f'{html.escape(_human_date(meta["date_iso"]))}</time>\n'
         f'    <a class="p-canonical" href="{html.escape(meta["canonical"])}"></a>\n'
+        f"{tags_block}"
         "  </footer>\n"
         "</article>\n</body>\n</html>\n"
     )
@@ -536,6 +612,138 @@ def append_manifest(out, meta, filename):
             _date_only(meta["date_iso"]), meta["title"],
             meta["author"], meta["canonical"], filename,
         ])
+
+
+# ── Tag inventory & pruning ──────────────────────────────────────────────────
+# Live Medium posts carry topic tags (captured into the footer as
+# <a class="p-category"> entries). Not every tag is worth keeping on a
+# self-hosted site — e.g. a tag naming the publication itself ("NPR"), or a tag
+# used on only one post out of hundreds. These helpers let the skill show the
+# user a tag inventory (each tag + how many posts use it) and then drop the ones
+# they don't want before the ZIP is packaged.
+
+def _norm_tag(text):
+    return re.sub(r"\s+", " ", html.unescape(text or "")).strip()
+
+
+def _footer_scope(soup):
+    """Tags live in the footer; scope tag operations there to avoid the body."""
+    return soup.find("footer") or soup
+
+
+def _post_tag_names(scope):
+    return [_norm_tag(a.get_text()) for a in scope.find_all("a", class_="p-category")]
+
+
+def tag_inventory(out):
+    """Scan posts/ and return [(display_name, post_count)] for every tag.
+
+    Tags are grouped case-insensitively (the most common spelling is shown) and
+    counted once per post. The list is sorted by count (desc) then name, so the
+    publication-wide tags and the one-off tags are both easy to spot.
+    """
+    posts_dir = os.path.join(out, "posts")
+    if not os.path.isdir(posts_dir):
+        return []
+    counts = {}      # key -> number of posts using it
+    display = {}     # key -> {spelling: occurrences} to pick a canonical label
+    for name in sorted(os.listdir(posts_dir)):
+        if not name.endswith(".html"):
+            continue
+        with open(os.path.join(posts_dir, name), encoding="utf-8") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
+        seen = set()
+        for tag in _post_tag_names(_footer_scope(soup)):
+            key = tag.lower()
+            if not tag or key in seen:
+                continue          # count each tag at most once per post
+            seen.add(key)
+            counts[key] = counts.get(key, 0) + 1
+            display.setdefault(key, {})
+            display[key][tag] = display[key].get(tag, 0) + 1
+    inventory = []
+    for key, count in counts.items():
+        label = max(display[key].items(), key=lambda kv: (kv[1], kv[0]))[0]
+        inventory.append((label, count))
+    inventory.sort(key=lambda kv: (-kv[1], kv[0].lower()))
+    return inventory
+
+
+def write_tags_report(out):
+    """Print the tag inventory and write it to tags.csv for the user to review."""
+    inventory = tag_inventory(out)
+    posts_dir = os.path.join(out, "posts")
+    if not inventory:
+        print("No tags found in posts/. Tags come from the live Medium page, so "
+              "personal exports have none and captures made before tag support "
+              "won't either — re-capture to pick them up.")
+        return inventory
+    report_path = os.path.join(out, "tags.csv")
+    with open(report_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["count", "tag"])
+        for tag, count in inventory:
+            w.writerow([count, tag])
+    total = len([f for f in os.listdir(posts_dir) if f.endswith(".html")])
+    print(f"\nTag inventory — {len(inventory)} distinct tag(s) across {total} post(s):")
+    for tag, count in inventory:
+        print(f"  {count:>4}  {tag}")
+    print(f"\nWritten to {report_path}.")
+    print("Review these with the user, then drop unwanted tags with")
+    print('  --prune-tags "Tag One,Tag Two"   and/or   --min-tag-count N')
+    print("and re-run --package.")
+    return inventory
+
+
+def prune_tags(out, drop_names=None, min_count=None):
+    """Remove unwanted topic tags from every captured post, in place.
+
+    drop_names: tag display names to remove (case-insensitive, comma list).
+    min_count:  also remove any tag used by fewer than this many posts.
+    Returns the set of tag display names actually removed.
+    """
+    posts_dir = os.path.join(out, "posts")
+    if not os.path.isdir(posts_dir):
+        print("No posts/ directory to prune.")
+        return set()
+    drop_keys = {_norm_tag(n).lower() for n in (drop_names or []) if _norm_tag(n)}
+    if min_count:
+        for tag, count in tag_inventory(out):
+            if count < min_count:
+                drop_keys.add(tag.lower())
+    if not drop_keys:
+        print("No tags selected to prune (nothing matched --prune-tags / --min-tag-count).")
+        return set()
+
+    removed = {}     # key -> display name actually removed
+    changed = 0
+    for name in sorted(f for f in os.listdir(posts_dir) if f.endswith(".html")):
+        path = os.path.join(posts_dir, name)
+        with open(path, encoding="utf-8") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
+        scope = _footer_scope(soup)
+        file_changed = False
+        for a in scope.find_all("a", class_="p-category"):
+            label = _norm_tag(a.get_text())
+            if label.lower() in drop_keys:
+                removed[label.lower()] = label
+                a.decompose()
+                file_changed = True
+        if file_changed:
+            # Drop the wrapping <p class="tags"> if it has no tags left.
+            for p in scope.find_all("p", class_="tags"):
+                if not p.find("a", class_="p-category"):
+                    p.decompose()
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(str(soup))
+            changed += 1
+    if removed:
+        print(f"Pruned {len(removed)} tag(s) from {changed} post(s): "
+              f"{', '.join(sorted(removed.values(), key=str.lower))}")
+    else:
+        print("No matching tags were present in any post.")
+    print("Re-run --package to rebuild the ZIP with the updated tags.")
+    return set(removed.values())
 
 
 def package_zip(out):
@@ -662,9 +870,35 @@ def main():
     )
     ap.add_argument("--enumerate-only", action="store_true", help="With --site: only write urls.txt.")
     ap.add_argument("--package", action="store_true", help="Build the ZIP from posts/ and exit.")
+    ap.add_argument(
+        "--tags-report",
+        action="store_true",
+        help="List every topic tag in posts/ with how many posts use it "
+        "(writes tags.csv), then exit. Review before pruning.",
+    )
+    ap.add_argument(
+        "--prune-tags",
+        help="Comma-separated tag names to remove from every captured post "
+        '(case-insensitive), e.g. --prune-tags "NPR,Misc". Then re-run --package.',
+    )
+    ap.add_argument(
+        "--min-tag-count",
+        type=int,
+        help="Remove any tag used by fewer than N posts (drops one-off tags). "
+        "Can be combined with --prune-tags.",
+    )
     args = ap.parse_args()
 
     ensure_dirs(args.out)
+
+    if args.tags_report:
+        write_tags_report(args.out)
+        return
+
+    if args.prune_tags or args.min_tag_count:
+        drop = args.prune_tags.split(",") if args.prune_tags else []
+        prune_tags(args.out, drop_names=drop, min_count=args.min_tag_count)
+        return
 
     if args.package:
         package_zip(args.out)

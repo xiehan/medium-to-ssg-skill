@@ -14,6 +14,8 @@ For each HTML file it pulls out exactly these elements and ignores everything el
 | Publish date | `<time class="dt-published" datetime="…">` (ISO 8601) | `date:` front matter |
 | Canonical URL | `<a class="p-canonical" href="…">` | the last path segment becomes the Hugo `alias` that preserves the old link |
 | Body | `<section data-field="body">…</section>` | the post content, converted to Markdown |
+| Author | `<a class="p-author">` (optional) | `author:` front matter |
+| Tags | `<a class="p-category">` entries (optional) | `tags:` front matter list |
 
 Two classes inside the body get special treatment by the converter:
 
@@ -26,6 +28,7 @@ You don't need to add those classes — but if your normalized body still contai
 
 Each post becomes a standalone HTML document with this shape.
 The four required elements are marked. The `p-author` block is **optional but recommended** — it's how multi-author attribution survives the migration (the converter emits an `author:` field when it's present).
+The `p-category` tag links are likewise **optional but recommended**: a personal Medium export omits tags, but this skill recovers them from the live post, and the converter writes them to the `tags:` front matter list (unless the user opts out via `EXTRACT_TAGS = False`).
 
 ```html
 <!DOCTYPE html>
@@ -58,6 +61,10 @@ The four required elements are marked. The `p-author` block is **optional but re
       March 11, 2020
     </time>                                                   <!-- REQUIRED -->
     <a class="p-canonical" href="https://mycompany.blog/post-title-abc123"></a>  <!-- REQUIRED -->
+    <p class="tags">                                          <!-- optional -->
+      <a class="p-category" href="">Engineering</a>
+      <a class="p-category" href="">Open Source</a>
+    </p>
   </footer>
 </article>
 </body>
@@ -69,6 +76,7 @@ The four required elements are marked. The `p-author` block is **optional but re
 - **Canonical URL = public post URL.** Set `p-canonical`'s `href` to the URL the post lives at today on the publication (e.g. `https://mycompany.blog/post-title-abc123`), **not** a `medium.com/...` mirror. The converter takes its last path segment (`post-title-abc123`) and creates a Hugo `alias` of `/post-title-abc123`, which is what keeps the old live link working after migration. Because only the last segment (the slug) is used, scraping from `medium.com/<pub>` preserves the link just as well — the slug is identical there. If you scraped from `medium.com/<pub>` because the custom domain lapsed, the `--canonical-base` flag re-homes each recorded canonical to the original domain for fidelity (see `references/scraping-strategy.md`, "The custom-domain deadline").
 - **Body uses a plain HTML subset.** The converter understands `p`, `h1`–`h4`, `ul`/`ol`/`li`, `blockquote`, `pre`/`code`, `a`, `strong`/`b`, `em`/`i`, `code`, `br`, `hr`, `img`, `figure>img` (image), and `figure>iframe` (turned into a Hugo `video` shortcode). It recurses through unknown wrapper tags (e.g. `div`, `span`), extracting their text and inline formatting. Normalize Medium's obfuscated markup down toward this subset so conversion is clean.
 - **Images stay as remote URLs.** Like Medium's real export, leave `<img src="https://cdn-images-1.medium.com/…">` pointing at Medium's CDN. `medium-to-ssg`'s converter (`convert_medium.py`) automatically downloads and self-hosts those images during conversion. Don't rewrite them here.
+- **Tags are recovered from the live page.** A personal "Download your information" export contains no tags, but a published Medium post does — this skill reads them from the post's "Topic" pill buttons (or the page's embedded data) and emits one `<a class="p-category">` per tag in the footer. The converter turns those into the Hugo `tags:` front matter list. If a post has no tags, the block is simply omitted.
 - **Filename.** Save each file as `<YYYY-MM-DD>_<slug>.html` inside a `posts/` directory, matching Medium's `YYYY-MM-DD_Post-Title-Slug-{hash}.html` convention. The converter doesn't parse the filename for data — it's for human inventory and uniqueness — but matching the convention keeps the ZIP indistinguishable from a real export.
 
 ## ZIP layout

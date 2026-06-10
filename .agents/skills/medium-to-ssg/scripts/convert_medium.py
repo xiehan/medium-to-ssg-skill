@@ -26,6 +26,12 @@ Byline chrome: scraped pages also prepend the on-page byline (author, "N min
 read", date) to the body; that leading block is detected and stripped too.
 Personal exports don't include it, so this is a no-op for them.
 
+Tags: Medium's personal "Download your information" export does not include a
+post's topic tags, but the medium-publication-export skill captures them into
+the export HTML as <a class="p-category"> entries. When present, they are
+written to the Hugo front matter's `tags:` list. Set EXTRACT_TAGS = False to
+omit them.
+
 Requires: beautifulsoup4 (pip install beautifulsoup4)
           (image downloading uses only the Python standard library)
 """
@@ -50,6 +56,12 @@ OUTPUT_DIR = "hugo-site/content/posts"  # Where to write .md files
 DOWNLOAD_IMAGES = True
 STATIC_DIR = "hugo-site/static"    # Hugo static root (served at the site root)
 IMAGE_DIR_NAME = "images"          # Subfolder under static/ for downloaded images
+
+# Preserve topic tags. When True, tags captured by the medium-publication-export
+# skill (<a class="p-category"> entries) are written to the front matter's
+# `tags:` list. Personal Medium exports contain no tags, so this is a no-op for
+# them. Set to False to omit tags entirely.
+EXTRACT_TAGS = True
 
 # Map each HTML filename to its intended clean slug.
 # The clean slug becomes the canonical URL: /posts/<slug>/
@@ -459,6 +471,24 @@ def convert_post(html_filename, clean_slug):
         safe_author = author.replace('"', '\\"')
         author_line = f'author: "{safe_author}"\n'
 
+    # Topic tags (present only when captured by medium-publication-export, as
+    # <a class="p-category"> entries outside the body). Personal exports have none.
+    tags_block = ""
+    if EXTRACT_TAGS:
+        seen = set()
+        tags = []
+        for el in soup.find_all(class_="p-category"):
+            tag_text = el.get_text(strip=True)
+            key = tag_text.lower()
+            if tag_text and key not in seen:
+                seen.add(key)
+                tags.append(tag_text)
+        if tags:
+            items = "".join(
+                f'  - "{t.replace(chr(34), chr(92) + chr(34))}"\n' for t in tags
+            )
+            tags_block = f"tags:\n{items}"
+
     front_matter = (
         f'---\n'
         f'title: "{safe_title}"\n'
@@ -467,6 +497,7 @@ def convert_post(html_filename, clean_slug):
         f'slug: "{clean_slug}"\n'
         f'aliases:\n'
         f'  - /{medium_slug}\n'
+        f'{tags_block}'
         f'---'
     )
 

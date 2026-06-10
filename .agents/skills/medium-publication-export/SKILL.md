@@ -53,7 +53,7 @@ Phase 1: Scope & Inputs
 - [ ] Phase 1: Scope & Inputs
 - [ ] Phase 2: Enumerate all post URLs
 - [ ] Phase 3: Capture post content
-- [ ] Phase 4: Normalize & package the ZIP
+- [ ] Phase 4: Review tags, normalize & package the ZIP
 - [ ] Phase 5: Verify & hand off to medium-to-ssg
 
 ## Failed / manual-capture posts
@@ -88,7 +88,7 @@ The whole point is compatibility. `medium-to-ssg`'s converter (`convert_medium.p
 3. `<a class="p-canonical" href="…">` — the **public** post URL (its last path segment becomes the Hugo alias that preserves the old link)
 4. `<section data-field="body">…</section>` — the article body
 
-Every file this skill emits **must** contain those four elements. The exact required structure, plus the optional `p-author` element this skill adds for multi-author attribution, is documented in `references/export-format.md`. Read it before writing or normalizing any HTML.
+Every file this skill emits **must** contain those four elements. The exact required structure, plus the optional `p-author` element this skill adds for multi-author attribution and the optional `p-category` tag links it recovers from the live post, is documented in `references/export-format.md`. Read it before writing or normalizing any HTML.
 
 The canonical URL matters: set it to the **public publication URL** the post lives at today (e.g. `https://mycompany.blog/some-title-abc123`). That last path segment is what `medium-to-ssg` turns into a redirect alias, so the old live links keep working after migration.
 
@@ -181,16 +181,36 @@ See `references/scraping-strategy.md` for enumeration details and troubleshootin
    ```
 3. Update the captured/failed counts and the failed-posts list in `export-status.md`.
 
-### Phase 4 — Normalize & package the ZIP
+### Phase 4 — Review tags, normalize & package the ZIP
 
-1. Once `posts/` holds every post, build the ZIP:
+1. Review the post topic tags with the user and drop any they don't want. Tags are captured from the live Medium pages (a personal export has none), and not all of them are worth keeping on a self-hosted site. List them with their post counts:
+
+   ```bash
+   python3 scripts/scrape_publication.py --tags-report
+   ```
+
+   This prints every tag and how many posts use it (and writes `tags.csv`). Show the user and ask which to keep. Two common reasons to drop a tag:
+   - **A publication-wide tag** that adds no value once self-hosted — e.g. a tag naming the publication itself (`Company Name`), which was useful for discovery on Medium but is redundant when every post on the new site is already about that subject.
+   - **One-off / rarely-used tags** that don't help organize the site (e.g. a tag used on a single post out of hundreds).
+
+   Drop the agreed tags by name, by minimum usage, or both, then rebuild the ZIP:
+
+   ```bash
+   # remove specific tags by name (case-insensitive):
+   python3 scripts/scrape_publication.py --prune-tags "NPR,Announcements"
+   # and/or remove every tag used by fewer than N posts:
+   python3 scripts/scrape_publication.py --min-tag-count 2
+   ```
+
+   Pruning edits the captured posts in place; re-run `--tags-report` to confirm the result. If the user wants to keep all tags, skip this step. Record which tags were dropped in `export-status.md`.
+2. Once `posts/` holds every post and the tags look right, build the ZIP:
 
    ```bash
    python3 scripts/scrape_publication.py --package
    ```
 
    This produces `medium-export-out/medium-publication-export.zip` containing a top-level `posts/` directory — the same layout Medium's personal export uses.
-2. Spot-check a few HTML files: open them and confirm the title, date, canonical URL, author, and body all look right.
+3. Spot-check a few HTML files: open them and confirm the title, date, canonical URL, author, tags, and body all look right.
 
 ### Phase 5 — Verify & hand off to medium-to-ssg
 
@@ -210,6 +230,7 @@ medium-export-out/
 │   ├── 2020-03-11_Some-Post-abc123.html
 │   └── ...
 ├── manifest.csv                     # Inventory: title, date, author, url, file
+├── tags.csv                         # (optional) tag inventory with post counts, from --tags-report
 ├── medium-publication-export.zip    # ← hand this to medium-to-ssg
 └── export-status.md                 # Progress tracker (resumable)
 ```
@@ -221,6 +242,7 @@ medium-export-out/
 - **Only export content the user owns or is authorized to migrate.** Confirm this in Phase 1 and do not proceed without it.
 - **Stay compatible.** Every emitted HTML file must contain the four required elements from `references/export-format.md`. Do not change `medium-to-ssg`'s converter to accommodate a different shape — produce the shape it already expects.
 - **Set `p-canonical` to the public post URL** so the old live links survive as Hugo aliases. If the custom domain has lapsed and you're scraping from `medium.com/<pub>`, use `--canonical-base` to re-home every post to the original domain (see "Preserving the publication's URLs").
+- **Confirm tags with the user before packaging.** Tags are captured from the live page, but the user decides which to keep. Use `--tags-report` to review and `--prune-tags` / `--min-tag-count` to drop unwanted ones. Don't silently discard tags, and don't keep ones the user asked to remove.
 - **Scrape politely.** Keep the request delay, use a real User-Agent, back off on 429/403, and never try to bypass paywalls or authentication. Use the logged-in save-post bookmarklet for member-only posts the user is entitled to.
 - **Be resumable.** Never wipe `posts/`; rely on the skip-existing behavior and keep `export-status.md` current so an interrupted export can continue in a fresh session.
 - **This skill stops at the ZIP.** Converting to Markdown, scaffolding Hugo, and hosting are the `medium-to-ssg` skill's job. Hand off; don't duplicate it.
