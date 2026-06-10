@@ -41,14 +41,24 @@ Flag any **hard-coded real-world values that should be placeholders**: GitHub re
 - Helper scripts should prefer the **standard library** (`convert_medium.py` needs `beautifulsoup4`; `scrape_publication.py` also needs `requests`); scrutinize any new dependency.
 - The scraper must stay respectful (rate-limited, no auth bypass) and only target content the user owns/controls.
 
-### 5. House style and the local checks
+### 5. Tests for the Python helpers (and when *not* to ask for one)
+
+The two helper scripts have a stdlib `unittest` suite under `tests/` (no pytest), run in CI. It is deliberately **regression-focused, not coverage-driven** — do not ask contributors to add a test for every change. Apply this philosophy when reviewing:
+
+- **Worth a test:** a change to the **behavior of a pure function** in the helpers — the HTML→Markdown conversion (`node_to_md` and friends), front-matter assembly (`convert_post`), metadata/date/tag extraction, URL/slug normalization, and the export-HTML format the converter consumes. Every past *bug fix* in these areas should gain one focused test that pins the corrected behavior, so it can't silently regress.
+- **Not worth a test (don't request one):** changes to the Markdown skill instructions (`SKILL.md`, `references/*.md`), CI/workflow/config edits, dependency-pin bumps, docstring/comment-only changes, and anything in the network/filesystem layer — `fetch`, `make_session`, the sitemap crawl, and file/ZIP output. Those are I/O glue around the tested core; mocking them would test the mock, not the migration. The skill docs themselves are validated by `lint_skills.py` and markdownlint, not unit tests.
+- **Rule of thumb:** if a PR changes a tested function's output, the matching test should change with it. If a PR only touches docs, CI, or I/O plumbing, a missing test is *not* a defect — don't flag it.
+- Tests must stay **fast and network-free** (no live HTTP); the converter tests disable image downloads and the scraper tests feed in small inline HTML fixtures.
+
+### 6. House style and the local checks
 
 - **Markdown is not hard-wrapped** — one line per paragraph. Don't request reflowing to a column width.
 - Use **relative links** between skill docs; the linter verifies they resolve.
-- A valid PR keeps all three CI checks green:
+- A valid PR keeps all four CI checks green:
   - `python3 tools/lint_skills.py`
   - `npx --yes markdownlint-cli2@0.22.1 "**/*.md"`
   - `python3 -m py_compile` on the Python helpers.
+  - `python3 -m unittest discover -s tests`
 
 ## Review style
 

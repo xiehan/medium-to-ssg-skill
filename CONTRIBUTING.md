@@ -34,7 +34,7 @@ Each skill is self-contained: a `SKILL.md` with YAML frontmatter (`name` + `desc
 
 ## Running the checks locally
 
-CI runs three checks; all three are quick and run locally:
+CI runs four checks; all four are quick and run locally:
 
 ```bash
 # 1. Skill structure + cross-reference links (zero dependencies)
@@ -48,14 +48,19 @@ python3 -m py_compile \
   tools/lint_skills.py \
   .agents/skills/medium-to-ssg/scripts/convert_medium.py \
   .agents/skills/medium-publication-export/scripts/scrape_publication.py
+
+# 4. Unit tests for the Python helpers (needs beautifulsoup4)
+python3 -m unittest discover -s tests
 ```
+
+The unit tests in [`tests/`](tests/) cover the pure parsing and transform functions of both helpers (HTML->Markdown conversion, front-matter assembly, metadata/date/tag extraction, URL handling) and are regression-focused: each past bug fix has a test that pins it. They touch no network. When you change a script's behavior, add or update a test alongside it.
 
 If you change a script's behavior, also run it end to end with its dependencies installed (`pip install beautifulsoup4 requests`) against a sample export.
 
 ## Pull requests
 
 - Keep PRs focused — one fix or feature per PR.
-- Make sure the three checks above pass.
+- Make sure the four checks above pass.
 - Describe the migration scenario your change affects.
 
 By contributing, you agree that your contributions are licensed under the repository's [MIT License](LICENSE).
