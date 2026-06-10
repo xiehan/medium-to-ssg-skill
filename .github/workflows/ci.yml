@@ -36,3 +36,14 @@ jobs:
             tools/lint_skills.py \
             .agents/skills/medium-to-ssg/scripts/convert_medium.py \
             .agents/skills/medium-publication-export/scripts/scrape_publication.py
+
+  unit-tests:
+    name: Python helper unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Install test dependencies
+        run: python3 -m pip install --user beautifulsoup4
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests
+
