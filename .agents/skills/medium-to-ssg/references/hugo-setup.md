@@ -7,12 +7,19 @@ Before writing any config, fetch and read the chosen theme's README from its Git
 - What `params` they support
 - What `mainSections` or equivalent setting controls which content appears on the home page (note whether it expects a singular or plural section name, e.g. `post` vs. `posts` — it must match your `content/` subdirectory or the home page will list nothing)
 - Whether they use Hugo Pipes, asset bundling, or just static files
-- Whether they require **Hugo Extended** (any theme that transpiles SCSS/SASS does)
+- Whether they require **Hugo Extended** (any theme that transpiles SCSS/SASS does) and/or a separate **Dart Sass** binary (themes whose SCSS uses the `dartsass` transpiler — e.g. Anatole — need it; Extended alone is not enough)
 - What front matter fields they use (e.g. `description`, `summary`, `cover`, `tags`)
 
 Do not guess theme config. Read its README, then write `hugo.toml` accordingly.
 
-**Check the theme's Hugo version and build prerequisites before scaffolding.** Note the theme's minimum Hugo version (often declared as `min_version` in the theme's `theme.toml`) and whether it needs **Hugo Extended** — any theme that transpiles SCSS/SASS via Hugo Pipes (look for `toCSS` / `resources.Get "...scss"` in `layouts/partials/head.html`) requires the extended build, and newer themes may also need a Dart Sass binary. A plain (non-extended) Hugo, or one missing Dart Sass, aborts the build on the SCSS step with a `TOCSS`/transpiler error. Confirm the Hugo that will build the site — both locally and in CI — satisfies this (`hugo version` should show `+extended`) before continuing.
+**Check the theme's Hugo version and build prerequisites before scaffolding.** Note the theme's minimum Hugo version (often declared as `min_version` in the theme's `theme.toml`) and whether it needs **Hugo Extended** — any theme that transpiles SCSS/SASS via Hugo Pipes (look for `toCSS` / `resources.Get "...scss"` in `layouts/partials/head.html`) requires the extended build. A plain (non-extended) Hugo aborts the build on the SCSS step with a `TOCSS` error. Confirm the Hugo that will build the site — both locally and in CI — is extended (`hugo version` should show `+extended`) before continuing.
+
+**Hugo Extended is not the same as Dart Sass.** Extended bundles only **LibSass**; it does *not* include Dart Sass. If the theme's SCSS sets `"transpiler" "dartsass"` (grep the theme's `head.html` / partials for `dartsass`), you must install a separate Dart Sass binary even though `hugo version` already shows `+extended`. Verify with `hugo env`: it should list a `github.com/sass/dart-sass/...` line, not just `libsass`. Install options:
+
+- **macOS (standalone, no extra taps):** download the latest `dart-sass-<version>-macos-<arch>.tar.gz` from <https://github.com/sass/dart-sass/releases>, extract it, and put the `sass` executable on your `PATH` (keep it alongside its sibling `src/` folder — the binary is a wrapper that needs it).
+- **Linux/CI:** do the same with the matching `linux-<arch>` archive, or use the theme/Hugo documented install. In GitHub Actions, add a step that downloads Dart Sass and adds it to `PATH` before `hugo --minify`.
+
+Gotcha: the SCSS failure is often **masked by a local `hugo` (production) build but breaks `hugo server` (development)** — many themes branch on `hugo.IsProduction` and swallow the transpile error in production while the development branch hard-errors. Don't treat a passing `hugo` build as proof Dart Sass is present; confirm it via `hugo env`.
 
 ## Step 2 — Initialize the Hugo project structure
 
