@@ -80,6 +80,8 @@ Open each output `.md` file and verify:
 - Links are intact
 - Bold and italic formatting is preserved
 - Any lists are properly formatted
+- **No Medium promo CTAs remain** — `convert_medium.py` strips Medium's inline subscribe / membership widgets ("Get \<author\>'s stories in your inbox", "Join Medium for free", "Sign up … Medium", "By signing up, you will create a Medium account …"). These most commonly appear in content captured with the `medium-publication-export` skill, but can occur from any source. If you still see any such CTA text in a converted file (Medium occasionally changes the wording), remove that block manually and add the new phrase to the `_CTA_PATTERNS` list in `convert_medium.py`, then re-run.
+- **No leading byline chrome remains** — content captured from a live page (via the `medium-publication-export` skill) can prepend the on-page byline (author name, "N min read", and the publish date) to the body. `convert_medium.py` detects and removes that leading block, so the post should start at its real first paragraph. Personal "Download your information" exports don't include this, so it's a no-op for them. If a stray "N min read" line survives at the top of a converted file, delete it manually.
 
 ### Step 4 — Handle embedded media
 

@@ -16,6 +16,16 @@ site is self-contained and won't break when Medium's CDN goes away. Set
 DOWNLOAD_IMAGES = False to keep the original remote URLs instead. If an
 individual download fails, the original remote URL is kept so nothing is lost.
 
+Promo CTAs: Medium's inline subscribe / membership call-to-action blocks
+("Get <author>'s stories in your inbox", "Join Medium for free", etc.) are
+detected by their text and stripped from the body so they don't leak into the
+Markdown. This is most common with content captured via the
+medium-publication-export skill, but applies to any source.
+
+Byline chrome: scraped pages also prepend the on-page byline (author, "N min
+read", date) to the body; that leading block is detected and stripped too.
+Personal exports don't include it, so this is a no-op for them.
+
 Requires: beautifulsoup4 (pip install beautifulsoup4)
           (image downloading uses only the Python standard library)
 """
@@ -127,7 +137,175 @@ def localize_image_src(src):
         return src
 
 
+# ── Medium promo CTA stripping ────────────────────────────────────────────────
+
+# Medium injects subscribe / membership call-to-action widgets into the rendered
+# article — e.g. "Get <author>'s stories in your inbox" or "Join Medium for
+# free". These are not part of the post and must not leak into the Markdown.
+# They most often appear when content was captured by the medium-publication-
+# export skill (scraped from the rendered page), but a personal export can carry
+# them too, so we strip them here regardless of source.
+#
+# The scraper normalizes away class names, so detection is by text content: each
+# CTA is a short, self-contained block whose text is dominated by one of these
+# phrases. Patterns are deliberately specific (they require the word "Medium" or
+# an unmistakable Medium phrase) to avoid removing legitimate article prose.
+_CTA_PATTERNS = [
+    re.compile(r"stories in your inbox", re.IGNORECASE),
+    re.compile(r"join medium for free", re.IGNORECASE),
+    re.compile(r"get the medium app", re.IGNORECASE),
+    re.compile(r"sign up\b.{0,40}\bmedium\b", re.IGNORECASE | re.DOTALL),
+    re.compile(r"by signing up,?\s+you will create a medium account", re.IGNORECASE),
+]
+_CTA_STATS = {"removed": 0}
+
+# Block-level tags a CTA widget is typically wrapped in.
+_CTA_BLOCK_TAGS = {
+    "p", "div", "section", "figure", "aside", "blockquote",
+    "h1", "h2", "h3", "h4", "a", "li", "ul",
+}
+# CTAs are short. Only blocks at or below this text length are eligible for
+# removal, so the patterns can never match a long content paragraph (or the
+# whole article body) by accident.
+_CTA_MAX_LEN = 400
+
+
+def _is_cta_text(text):
+    return bool(text) and len(text) <= _CTA_MAX_LEN and any(
+        p.search(text) for p in _CTA_PATTERNS
+    )
+
+
+def _still_attached(node, root):
+    """True if node is still within root (not already removed via an ancestor)."""
+    cur = node
+    while cur is not None:
+        if cur is root:
+            return True
+        cur = cur.parent
+    return False
+
+
+def strip_medium_ctas(body_section):
+    """Remove Medium subscribe / membership promo CTA blocks from the body.
+
+    Returns the number of CTA blocks removed.
+    """
+    removed = 0
+    candidates = body_section.find_all(_CTA_BLOCK_TAGS)
+    for el in candidates:
+        if not _still_attached(el, body_section):
+            continue  # was inside a CTA block already decomposed
+        if not _is_cta_text(el.get_text(" ", strip=True)):
+            continue
+        # Expand to the outermost still-CTA-sized block so the whole widget
+        # (heading + body + button text) is removed, not just one inner line.
+        target = el
+        parent = el.parent
+        while (
+            parent is not None
+            and parent is not body_section
+            and parent.name in _CTA_BLOCK_TAGS
+            and _is_cta_text(parent.get_text(" ", strip=True))
+        ):
+            target = parent
+            parent = parent.parent
+        target.decompose()
+        removed += 1
+    _CTA_STATS["removed"] += removed
+    return removed
+
+
+# ── Medium byline-chrome stripping ────────────────────────────────────────────
+
+# Scraped Medium pages prepend the article's on-page byline chrome to the body:
+# the author's avatar, a (duplicated) author link, an "N min read" estimate, and
+# the publish date — often followed by a "--" separator. Personal "Download your
+# information" exports don't include this (their body starts at the real first
+# paragraph), but content captured by the medium-publication-export skill does,
+# so we strip the leading byline block here.
+#
+# Anchor: "N min read". That token is part of every Medium byline and effectively
+# never appears in article prose, which makes it a precise, source-agnostic
+# signal. We only remove a block whose *entire* text is the byline
+# ("<author> N min read <date> --"); any real prose after the separator breaks
+# the full match, so a short post's content can never be mistaken for byline.
+_BYLINE_STATS = {"removed": 0}
+
+# Full-match for a byline-only block: an optional author, the "N min read"
+# estimate, an optional "Mon D, YYYY" date, and an optional trailing separator —
+# and nothing else.
+_BYLINE_FULL_RE = re.compile(
+    r"^\s*.{0,120}?\b\d+\s+min read\b"            # optional author + "N min read"
+    r"(?:\s+[A-Za-z]{3,9}\.?\s+\d{1,2}\s*,?\s*\d{4})?"  # optional "Mon D, YYYY"
+    r"\s*(?:--|—|–|·)?\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Block tags the byline cluster is wrapped in (Medium uses nested <div>s).
+_BYLINE_BLOCK_TAGS = {"p", "div", "section", "span", "a", "figure", "header"}
+# A bare separator Medium sometimes leaves between the byline and the body.
+_SEPARATOR_TEXTS = {"--", "—", "–", "·"}
+
+
+def strip_medium_byline(body_section):
+    """Remove the leading author/read-time/date byline chrome from the body.
+
+    Returns the number of byline blocks removed (0 or 1).
+    """
+    removed = 0
+    # In document order the first element whose *entire* text matches the byline
+    # signature is the outermost byline-only block (ancestors also contain real
+    # content, so they fail the full match). Remove it and stop.
+    for el in body_section.find_all(_BYLINE_BLOCK_TAGS):
+        if not _still_attached(el, body_section):
+            continue
+        if _BYLINE_FULL_RE.match(el.get_text(" ", strip=True)):
+            el.decompose()
+            removed = 1
+            break
+
+    # Drop a now-leading bare separator left behind by the byline (e.g. "--").
+    if removed:
+        for el in body_section.find_all(_BYLINE_BLOCK_TAGS):
+            text = el.get_text(" ", strip=True)
+            if text == "":
+                continue
+            if text in _SEPARATOR_TEXTS and not el.find("img"):
+                el.decompose()
+            break  # only inspect the first non-empty block
+
+    _BYLINE_STATS["removed"] += removed
+    return removed
+
+
 # ── Conversion logic ─────────────────────────────────────────────────────────
+
+def _split_edge_ws(text):
+    """Split leading/trailing whitespace from text.
+
+    Returns (leading_ws, core, trailing_ws). Markdown emphasis and link
+    markers cannot sit directly against whitespace (``* text *`` is not valid
+    emphasis), so boundary whitespace that lived inside an inline tag has to be
+    re-emitted outside the markers instead of being dropped.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return "", "", ""
+    start = text.index(stripped[0])
+    end = start + len(stripped)
+    lead = " " if text[:start] else ""
+    trail = " " if text[end:] else ""
+    return lead, stripped, trail
+
+
+def _wrap_inline(inner, prefix, suffix):
+    """Wrap inner content in inline markers, preserving boundary whitespace."""
+    lead, core, trail = _split_edge_ws(inner)
+    if not core:
+        return ""
+    return f"{lead}{prefix}{core}{suffix}{trail}"
+
 
 def node_to_md(node):
     """Recursively convert a BeautifulSoup node to Markdown text."""
@@ -139,19 +317,22 @@ def node_to_md(node):
     # Inline elements
     if tag in ("strong", "b"):
         inner = "".join(node_to_md(c) for c in node.children)
-        return f"**{inner.strip()}**" if inner.strip() else ""
+        return _wrap_inline(inner, "**", "**")
     if tag in ("em", "i"):
         inner = "".join(node_to_md(c) for c in node.children)
-        return f"*{inner.strip()}*" if inner.strip() else ""
+        return _wrap_inline(inner, "*", "*")
     if tag == "a":
-        inner = "".join(node_to_md(c) for c in node.children).strip()
+        inner = "".join(node_to_md(c) for c in node.children)
         href = node.get("href", "")
-        return f"[{inner}]({href})" if inner else ""
+        if not inner.strip():
+            return ""
+        lead, core, trail = _split_edge_ws(inner)
+        return f"{lead}[{core}]({href}){trail}"
     if tag == "br":
         return "\n"
     if tag == "code":
         inner = "".join(node_to_md(c) for c in node.children)
-        return f"`{inner}`"
+        return _wrap_inline(inner, "`", "`")
     if tag == "img":
         src = node.get("src") or node.get("data-src") or ""
         alt = node.get("alt", "").strip()
@@ -254,6 +435,15 @@ def convert_post(html_filename, clean_slug):
     for divider in body_section.find_all(class_="section-divider"):
         divider.decompose()
 
+    # Remove the leading author / "N min read" / date byline chrome that scraped
+    # pages prepend to the body. See strip_medium_byline above.
+    strip_medium_byline(body_section)
+
+    # Remove Medium subscribe / membership promo CTAs ("Get <author>'s stories
+    # in your inbox", "Join Medium for free", etc.) that can leak into scraped
+    # content. See strip_medium_ctas above.
+    strip_medium_ctas(body_section)
+
     md_body = node_to_md(body_section)
 
     # Collapse more than two consecutive newlines
@@ -306,6 +496,12 @@ def main():
             errors.append((html_filename, str(e)))
 
     print(f"\n{success}/{len(posts)} posts converted successfully.")
+    if _BYLINE_STATS["removed"]:
+        print(f"Removed {_BYLINE_STATS['removed']} leading Medium byline "
+              f"block(s) (author / read time / date).")
+    if _CTA_STATS["removed"]:
+        print(f"Removed {_CTA_STATS['removed']} Medium promo CTA block(s) "
+              f"(subscribe / \"Join Medium for free\").")
     if DOWNLOAD_IMAGES:
         s = _IMAGE_STATS
         print(

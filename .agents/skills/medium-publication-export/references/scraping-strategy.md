@@ -85,7 +85,7 @@ For each URL the script:
 
 1. Fetches the post HTML with a real User-Agent and a polite delay (default ~1s; tune with `--delay`).
 2. Extracts metadata from the page's structured data (`<script type="application/ld+json">`) with `<meta>`/`<title>` fallbacks: title, publish date, author, canonical URL.
-3. Finds the article body (the densest content container under `<article>`), strips non-content cruft (scripts, buttons, share widgets, the duplicated title), and normalizes images.
+3. Finds the article body (the densest content container under `<article>`), strips non-content cruft (scripts, buttons, share widgets, the duplicated title, the leading author / "N min read" / date byline, and inline subscribe / membership CTAs), and normalizes images.
 4. Writes an export-format HTML file to `posts/<date>_<slug>.html` (see `references/export-format.md`).
 5. Records the result in `manifest.csv`.
 

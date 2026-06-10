@@ -91,6 +91,91 @@ JUNK_TAGS = ["script", "style", "noscript", "svg", "button", "form", "nav", "asi
 # keep the normalized HTML small and predictable for the converter.
 KEEP_ATTRS = {"href", "src", "alt", "datetime"}
 
+# ── Medium UI chrome that leaks into scraped article bodies ───────────────────
+# A live Medium page renders the on-page byline (author, "N min read", date) and
+# inline subscribe / membership promos inside the article. These are not part of
+# the post, so we strip them here — before the export is written — so the ZIP
+# matches a clean personal "Download your information" export. medium-to-ssg's
+# convert_medium.py strips the same things again as a backstop for other sources.
+
+# A byline-only block: optional author, "N min read", optional "Mon D, YYYY"
+# date, optional trailing separator, and nothing else (real prose after the
+# separator breaks the match, so post content is never removed).
+_BYLINE_FULL_RE = re.compile(
+    r"^\s*.{0,120}?\b\d+\s+min read\b"
+    r"(?:\s+[A-Za-z]{3,9}\.?\s+\d{1,2}\s*,?\s*\d{4})?"
+    r"\s*(?:--|—|–|·)?\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+_SEPARATOR_TEXTS = {"--", "—", "–", "·"}
+
+# Inline subscribe / membership CTA phrases (short blocks only).
+_CTA_PATTERNS = [
+    re.compile(r"stories in your inbox", re.IGNORECASE),
+    re.compile(r"join medium for free", re.IGNORECASE),
+    re.compile(r"get the medium app", re.IGNORECASE),
+    re.compile(r"sign up\b.{0,40}\bmedium\b", re.IGNORECASE | re.DOTALL),
+    re.compile(r"by signing up,?\s+you will create a medium account", re.IGNORECASE),
+]
+_CTA_BLOCK_TAGS = {
+    "p", "div", "section", "figure", "aside", "blockquote",
+    "h1", "h2", "h3", "h4", "a", "li", "ul",
+}
+_CTA_MAX_LEN = 400
+
+
+def _node_attached(node, root):
+    cur = node
+    while cur is not None:
+        if cur is root:
+            return True
+        cur = cur.parent
+    return False
+
+
+def _is_cta_text(text):
+    return bool(text) and len(text) <= _CTA_MAX_LEN and any(
+        p.search(text) for p in _CTA_PATTERNS
+    )
+
+
+def strip_medium_chrome(soup):
+    """Remove the leading byline block and inline subscribe/membership CTAs."""
+    # Leading byline: the first block in document order whose entire text is the
+    # byline signature is the outermost byline-only block; remove it once.
+    for el in soup.find_all(True):
+        if not _node_attached(el, soup):
+            continue
+        if _BYLINE_FULL_RE.match(el.get_text(" ", strip=True)):
+            el.decompose()
+            break
+    # A bare separator left behind at the top (e.g. "--").
+    for el in soup.find_all(True):
+        text = el.get_text(" ", strip=True)
+        if text == "":
+            continue
+        if text in _SEPARATOR_TEXTS and not el.find("img"):
+            el.decompose()
+        break
+
+    # Inline promo CTAs anywhere in the body.
+    for el in soup.find_all(_CTA_BLOCK_TAGS):
+        if not _node_attached(el, soup):
+            continue
+        if not _is_cta_text(el.get_text(" ", strip=True)):
+            continue
+        target = el
+        parent = el.parent
+        while (
+            parent is not None
+            and parent is not soup
+            and parent.name in _CTA_BLOCK_TAGS
+            and _is_cta_text(parent.get_text(" ", strip=True))
+        ):
+            target = parent
+            parent = parent.parent
+        target.decompose()
+
 
 # ── URL helpers ──────────────────────────────────────────────────────────────
 
@@ -355,6 +440,10 @@ def normalize_body(container, title):
         if h.get_text(strip=True) == title.strip():
             h.decompose()
             break
+
+    # Remove Medium UI chrome (leading byline + inline subscribe/membership CTAs)
+    # so the export body starts at the real first paragraph.
+    strip_medium_chrome(soup)
 
     # Normalize images to a clean <img src> the converter understands.
     for img in soup.find_all("img"):
