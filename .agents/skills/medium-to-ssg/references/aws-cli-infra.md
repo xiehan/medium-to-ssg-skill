@@ -304,7 +304,7 @@ After creating the role, note its ARN — it becomes the `AWS_ROLE_ARN` GitHub s
 
 ## `infra/deploy.sh` — build + deploy content (the set-and-forget default)
 
-For users who don't want GitHub Actions, this is how they publish the site (and republish on the rare occasion they edit a post). Run it from the `hugo-site/` directory.
+For users who don't want GitHub Actions, this is how they publish the site (and republish on the rare occasion they edit a post). Run it from the SSG project root — `hugo-site/` for Hugo, `eleventy-site/` for Eleventy.
 
 ```bash
 #!/usr/bin/env bash
@@ -312,7 +312,7 @@ set -euo pipefail
 source "$(dirname "$0")/00-config.sh"
 source "$(dirname "$0")/.dist_id"
 
-# 1. Build (run from the Hugo site root)
+# 1. Build (run from the site root)
 hugo --minify
 
 # 2. Sync to S3
@@ -323,6 +323,16 @@ aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 
 echo "Deployed. It can take a few minutes for the cache invalidation to complete."
 ```
+
+> **Eleventy variant:** swap steps 1–2 for the Node toolchain and the Eleventy output directory; step 3 is unchanged:
+>
+> ```bash
+> # 1. Build (run from eleventy-site/)
+> npx @11ty/eleventy
+>
+> # 2. Sync to S3 (Eleventy builds into _site/, not public/)
+> aws s3 sync _site/ "s3://$BUCKET/" --delete --cache-control "public, max-age=3600"
+> ```
 
 ---
 

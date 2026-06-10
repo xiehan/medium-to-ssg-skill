@@ -30,16 +30,32 @@ body:
       label: What should happen instead?
     validations:
       required: true
+  - type: dropdown
+    id: ssg
+    attributes:
+      label: Static site generator (if the bug involves the generated site)
+      description: >-
+        Which SSG did you choose? Many build/styling problems are specific to
+        one generator. Leave as "Not applicable" if your issue isn't about
+        building the site.
+      options:
+        - Not applicable
+        - Hugo
+        - Eleventy (11ty)
+    validations:
+      required: false
   - type: input
     id: theme
     attributes:
-      label: Hugo theme (if the bug involves the Hugo site)
+      label: Theme or starter (if the bug involves the generated site)
       description: >-
-        Many Hugo build/styling problems are theme-specific. If your issue
-        relates to scaffolding or building the Hugo site, name the theme and
-        link its repo (e.g. "Anatole — https://github.com/lxndrblz/anatole").
-        Leave blank if not relevant.
-      placeholder: Theme name — repo URL
+        Many build/styling problems are theme- or starter-specific. If your
+        issue relates to scaffolding or building the site, name the Hugo theme
+        or Eleventy starter and link its repo (e.g. "Anatole —
+        https://github.com/lxndrblz/anatole" or "eleventy-base-blog —
+        https://github.com/11ty/eleventy-base-blog"). Leave blank if not
+        relevant.
+      placeholder: Theme or starter name — repo URL
     validations:
       required: false
   - type: textarea
@@ -48,7 +64,8 @@ body:
       label: Context
       description: >-
         Hosting path (AWS / GitHub Pages), infra method (Terraform / AWS CLI),
-        personal vs. publication export, OS, Hugo version (incl. whether it's
-        the extended build) — anything relevant.
+        personal vs. publication export, OS, and the generator version — Hugo
+        version (incl. whether it's the extended build) or Node.js + Eleventy
+        version — anything relevant.
     validations:
       required: false

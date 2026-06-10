@@ -12,12 +12,12 @@ The rest of this file covers **AWS** hosting.
 
 | File | Trigger | Purpose |
 |---|---|---|
-| `.github/workflows/deploy.yml` | Push to `main` | Build Hugo site, sync to S3, invalidate CloudFront |
+| `.github/workflows/deploy.yml` | Push to `main` | Build the site, sync to S3, invalidate CloudFront |
 | `.github/workflows/terraform.yml` | PR or push to `main`, paths: `terraform/**` | Plan on PR (posts comment), apply on merge |
 
 Plus a Dependabot config to keep action versions updated.
 
-**Manual script (default for the AWS CLI / set-and-forget path):** Do **not** generate any GitHub Actions workflows. Instead, the user deploys with `infra/deploy.sh` (see `references/aws-cli-infra.md`), which builds Hugo and syncs to S3 + invalidates CloudFront from their machine. No GitHub secrets, no OIDC role.
+**Manual script (default for the AWS CLI / set-and-forget path):** Do **not** generate any GitHub Actions workflows. Instead, the user deploys with `infra/deploy.sh` (see `references/aws-cli-infra.md`), which builds the site and syncs to S3 + invalidates CloudFront from their machine. No GitHub secrets, no OIDC role.
 
 **Method-by-method summary:**
 
@@ -119,6 +119,38 @@ jobs:
 The `submodules: recursive` checkout option is harmless but unnecessary on this path.
 
 **Note on Hugo version**: The version string in the workflow must match the user's local Hugo version to avoid build differences. Ask the user to run `hugo version` locally and use that exact version number.
+
+### Eleventy variant
+
+The `deploy.yml` above is written for the **Hugo** path. For an **Eleventy** site, only the *build* portion changes; the AWS credential, S3 sync, and CloudFront-invalidation steps are identical except that the sync source is the Eleventy output directory. Replace the checkout + Hugo + build steps with a Node toolchain, and sync `_site/` instead of `public/`:
+
+```yaml
+      - uses: actions/checkout@SHA_HERE  # vX.Y.Z
+        # No `submodules: recursive` needed — the Eleventy starter is committed,
+        # not a theme submodule (unless you separately added one).
+
+      - uses: actions/setup-node@SHA_HERE  # vX.Y.Z
+        with:
+          node-version-file: ".nvmrc"   # matches the version the starter ships
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npx @11ty/eleventy
+
+      # ... configure-aws-credentials step is unchanged ...
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync _site/ s3://${{ vars.S3_BUCKET }}/ \
+            --delete \
+            --cache-control "public, max-age=3600"
+
+      # ... CloudFront invalidation step is unchanged ...
+```
+
+Use `node-version-file: ".nvmrc"` so CI builds with the same Node the user builds with locally (a local/CI Node mismatch is the most common Eleventy CI failure). Do not add the `peaceiris/actions-hugo` step on this path.
 
 ---
 
@@ -238,6 +270,25 @@ updates:
 ```
 
 This single entry covers all workflows under `.github/workflows/`. Dependabot will open PRs to update pinned SHAs when new action versions are released, keeping the version comments in sync automatically.
+
+### Eleventy: also track npm dependencies
+
+When the SSG is **Eleventy**, the site is an npm project (`package.json` at the repo root, alongside `.github/`), so add a second `npm` ecosystem entry to keep Eleventy and its plugins patched. Do this **regardless of hosting platform or deployment method** — it is about the project's JavaScript dependencies, not CI:
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: github-actions   # omit this entry if no workflows are generated
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /                        # package.json lives at the repo root
+    schedule:
+      interval: weekly
+```
+
+On the **AWS CLI + manual deploy** Eleventy path there are no workflows, so there is no `github-actions` entry and no `.github/workflows/` folder — but still create `.github/dependabot.yml` with **just the `npm` entry** so dependencies stay current. On the Hugo path, omit the `npm` entry entirely (Hugo is a single binary with no `package.json` to track, unless a theme adds a PostCSS toolchain — see `references/hugo-setup.md`).
 
 ---
 

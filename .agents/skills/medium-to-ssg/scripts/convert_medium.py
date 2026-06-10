@@ -1,13 +1,15 @@
 """
-convert_medium.py — Convert Medium HTML export files to Hugo Markdown.
+convert_medium.py — Convert Medium HTML export files to Hugo or Eleventy Markdown.
 
 Usage:
-    1. Edit the `posts` list below to include only the posts you want to migrate.
+    1. Set SSG to your target generator: "hugo" (default) or "eleventy".
+    2. Edit the `posts` list below to include only the posts you want to migrate.
        Map each HTML filename (from the Medium export's posts/ directory) to
        the clean slug you want for the canonical URL (title without the hash).
-    2. Set INPUT_DIR to the directory containing the extracted HTML files.
-    3. Set OUTPUT_DIR to where you want the Markdown files written.
-    4. Run: python3 convert_medium.py
+    3. Set INPUT_DIR to the directory containing the extracted HTML files.
+    4. Set OUTPUT_DIR (and, for image self-hosting, STATIC_DIR) to where you want
+       output written — point these at hugo-site/ or eleventy-site/ to match SSG.
+    5. Run: python3 convert_medium.py
 
 Images: by default, remote images (Medium's CDN and any other external image
 URLs) are downloaded into the Hugo static directory and the Markdown is
@@ -59,14 +61,31 @@ from urllib.parse import urlparse
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
+# Target static site generator: "hugo" (default) or "eleventy". This controls
+# only the per-post front matter and how an embedded video is emitted; the rest
+# (HTML→Markdown, image self-hosting, CTA/byline stripping) is identical.
+#   - hugo:     writes `slug:` + `aliases:`; video as a {{< video >}} shortcode.
+#               The *_DIR defaults below target hugo-site/.
+#   - eleventy: writes `permalink:` + `aliases:`; video as an {% video %}
+#               shortcode. Point the *_DIR values at eleventy-site/ instead, e.g.
+#               OUTPUT_DIR = "eleventy-site/content/blog" (the eleventy-base-blog
+#               posts dir) and STATIC_DIR = "eleventy-site/public" (its passthrough
+#               root, served at the site root just like Hugo's static/).
+SSG = "hugo"
+
+# Canonical URL prefix for posts; must match the site's permalink config (Hugo's
+# [permalinks] / Eleventy's permalink). Used to build the Eleventy `permalink:`
+# field. Hugo derives the path from `slug:` + hugo.toml, so this is unused there.
+PERMALINK_PREFIX = "/posts"
+
 INPUT_DIR = "work/medium-posts"    # Directory containing extracted HTML files
 OUTPUT_DIR = "hugo-site/content/posts"  # Where to write .md files
 
 # Image self-hosting. When True, remote images are downloaded into
 # STATIC_DIR/IMAGE_DIR_NAME and references are rewritten to /<IMAGE_DIR_NAME>/...
 DOWNLOAD_IMAGES = True
-STATIC_DIR = "hugo-site/static"    # Hugo static root (served at the site root)
-IMAGE_DIR_NAME = "images"          # Subfolder under static/ for downloaded images
+STATIC_DIR = "hugo-site/static"    # Static/passthrough root (served at site root)
+IMAGE_DIR_NAME = "images"          # Subfolder under STATIC_DIR for downloaded images
 
 # Preserve topic tags. When True, tags captured by the medium-publication-export
 # skill (<a class="p-category"> entries) are written to the front matter's
@@ -465,13 +484,16 @@ def node_to_md(node):
     if tag == "hr":
         return "\n\n---\n\n"
 
-    # Embedded media (iframe inside a figure element)
-    # Converted to a Hugo shortcode: {{< video src="..." >}}
-    # Requires layouts/shortcodes/video.html to be created in the Hugo project.
+    # Embedded media (iframe inside a figure element), converted to a video
+    # shortcode the site must define:
+    #   - hugo:     {{< video src="..." >}}  (layouts/shortcodes/video.html)
+    #   - eleventy: {% video "..." %}        (an addShortcode in eleventy.config)
     if tag == "figure":
         iframe = node.find("iframe")
         if iframe:
             src = iframe.get("src", "")
+            if SSG == "eleventy":
+                return f'\n\n{{% video "{src}" %}}\n\n'
             return f'\n\n{{{{< video src="{src}" >}}}}\n\n'
         img = node.find("img")
         if img:
@@ -587,12 +609,22 @@ def convert_post(html_filename, clean_slug):
             )
             tags_block = f"tags:\n{items}"
 
+    # Canonical URL: Hugo derives /posts/<slug>/ from `slug:` + hugo.toml's
+    # [permalinks]; Eleventy has no such central map, so write an explicit
+    # `permalink:`. The Medium-style slug is preserved as an alias either way
+    # (Hugo emits the redirect stub from `aliases:`; on Eleventy a redirects
+    # template consumes the same field — see references/eleventy-setup.md).
+    if SSG == "eleventy":
+        url_line = f'permalink: "{PERMALINK_PREFIX}/{clean_slug}/"\n'
+    else:
+        url_line = f'slug: "{clean_slug}"\n'
+
     front_matter = (
         f'---\n'
         f'title: "{safe_title}"\n'
         f'date: {date}\n'
         f'{author_line}'
-        f'slug: "{clean_slug}"\n'
+        f'{url_line}'
         f'aliases:\n'
         f'  - /{medium_slug}\n'
         f'{tags_block}'
@@ -603,6 +635,9 @@ def convert_post(html_filename, clean_slug):
 
 
 def main():
+    if SSG not in ("hugo", "eleventy"):
+        print(f"ERROR: SSG must be \"hugo\" or \"eleventy\", not {SSG!r}.")
+        return
     if not posts:
         print("ERROR: The `posts` list is empty. Edit convert_medium.py to add your posts.")
         return

@@ -26,6 +26,15 @@ hugo_stats.json
 # Hugo themes are pulled in as a submodule or clone, not committed here.
 themes/
 
+# --- medium-to-ssg: generated Eleventy site --------------------------------
+# A test run scaffolds an Eleventy project (cloned from eleventy-base-blog)
+# under eleventy-site/ in the working directory; like hugo-site/ it's entirely
+# generated output.
+eleventy-site/
+# Eleventy build output (the analog of Hugo's public/), in case a test run is
+# done from a different working directory.
+_site/
+
 # --- medium-to-ssg: generated infrastructure (AWS paths) -------------------
 # Terraform state is sensitive and machine-local; never commit it.
 *.tfstate

@@ -2,7 +2,9 @@
 
 This is the **alternative to AWS** for users who want the lowest-cost, simplest setup and are willing to cede fine-grained control. GitHub builds and hosts the Hugo site for free (for public repositories), provisions HTTPS automatically, and serves a custom domain — with **no S3, CloudFront, ACM, Route 53, Terraform, or AWS account**.
 
-Use this path only when the hosting platform recorded in `migration-status.md` is `github-pages`. The content extraction/conversion (Phases 1–2) and Hugo scaffolding (Phase 3) are identical to the AWS path; only hosting (Phase 4), deployment (Phase 5), and DNS cutover (Phases 6–7) differ.
+Use this path only when the hosting platform recorded in `migration-status.md` is `github-pages`. The content extraction/conversion (Phases 1–2) and site scaffolding (Phase 3) are identical to the AWS path; only hosting (Phase 4), deployment (Phase 5), and DNS cutover (Phases 6–7) differ.
+
+> This file shows the **Hugo** configuration inline. For an **Eleventy** site the only differences are the base-URL/`CNAME` locations (noted in Phase 4 below) and the build steps in the deploy workflow (the **Eleventy variant** block in Phase 5). Everything else — custom-domain setup, DNS records, HTTPS — is identical.
 
 > Requirements for the user: a GitHub account and a repository. For **free** Pages the repository must be **public**. Private repositories require a paid plan (GitHub Pro, Team, or Enterprise). Confirm this with the user before proceeding.
 
@@ -10,8 +12,8 @@ Use this path only when the hosting platform recorded in `migration-status.md` i
 
 ## What carries over from the AWS path
 
-- **Hugo aliases still preserve old Medium URLs.** They generate static `<meta refresh>` redirect pages that work on GitHub Pages exactly as they do on S3. No change needed.
-- **`404.html`** is served automatically by GitHub Pages for missing paths.
+- **Old Medium URLs are still preserved.** On Hugo, the `aliases` field generates static `<meta refresh>` redirect pages that work on GitHub Pages exactly as they do on S3. On Eleventy, the redirects collection + template (`references/eleventy-setup.md`) generates the same static stubs — equally host-agnostic. No change needed for either.
+- **`404.html`** is served automatically by GitHub Pages for missing paths (both Hugo and the `eleventy-base-blog` starter emit one).
 - **Permalink structure** (`/posts/<slug>/`) and the converted post files are unchanged.
 
 ## What is different from AWS (the control tradeoffs)
@@ -44,13 +46,14 @@ The site must build with the final custom domain as its `baseURL`:
 baseURL = "https://example.com/"
 ```
 
+> **Eleventy:** there is no `hugo.toml`. Set the production URL in `_data/metadata.js` (`url: "https://example.com/"`) instead; the feed and absolute links read from it.
+
 ### 3. Add the `CNAME` file
 
-GitHub Pages reads a `CNAME` file at the site root to bind the custom domain. With Hugo, put it in `static/` so it is copied verbatim into the built `public/` output:
+GitHub Pages reads a `CNAME` file at the site root to bind the custom domain. Put it in the SSG's passthrough root so it is copied verbatim into the build output:
 
-```
-hugo-site/static/CNAME
-```
+- **Hugo:** `hugo-site/static/CNAME` (copied into `public/`).
+- **Eleventy:** `eleventy-site/public/CNAME` (the base blog passes `public/` through to `_site/`).
 
 Contents (apex domain only, no scheme, no `www`):
 
@@ -58,13 +61,15 @@ Contents (apex domain only, no scheme, no `www`):
 example.com
 ```
 
-> Note: GitHub also writes this file automatically when you set the custom domain in the repo UI. Committing it in `static/CNAME` keeps it from being wiped on each Actions deploy, which is the recommended approach when deploying via GitHub Actions.
+> Note: GitHub also writes this file automatically when you set the custom domain in the repo UI. Committing it in the passthrough root keeps it from being wiped on each Actions deploy, which is the recommended approach when deploying via GitHub Actions.
 
 ### 4. Theme submodule or module
 
-If the chosen theme is added as a git submodule, ensure `.gitmodules` is committed. The deploy workflow checks out submodules so the theme is present at build time.
+This applies to **Hugo** only. If the chosen theme is added as a git submodule, ensure `.gitmodules` is committed. The deploy workflow checks out submodules so the theme is present at build time.
 
 If the theme is instead installed as a **Hugo Module** (a `[module]` import with `go.mod`/`go.sum` and no `themes/` submodule), commit `go.mod` and `go.sum`, and add an `actions/setup-go` step to the deploy workflow before the build so Hugo can fetch the module (see the module note in `references/cicd.md`).
+
+> **Eleventy** has no theme submodule — the starter is committed directly into `eleventy-site/`, and the deploy workflow installs npm dependencies instead (see the Eleventy variant in Phase 5).
 
 ---
 
@@ -135,7 +140,45 @@ updates:
       interval: weekly
 ```
 
+> **Eleventy:** add a second `npm` entry so the starter's JavaScript dependencies stay patched too (the `npm` ecosystem applies on every hosting path — see "Eleventy: also track npm dependencies" in `references/cicd.md`):
+>
+> ```yaml
+>   - package-ecosystem: npm
+>     directory: /                    # package.json lives at the repo root
+>     schedule:
+>       interval: weekly
+> ```
+
 **Do not** generate `terraform.yml`, any AWS credential steps, OIDC role, or S3 sync — none apply to GitHub Pages.
+
+### Eleventy variant
+
+For an **Eleventy** site, keep the `configure-pages` / `upload-pages-artifact` / `deploy-pages` structure above and swap only the build steps. Replace the `actions/checkout` (with submodules), `peaceiris/actions-hugo`, and `hugo --minify` steps with a Node toolchain, and point the artifact at `_site/` instead of `./public`:
+
+```yaml
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@SHA_HERE  # vX.Y.Z
+
+      - uses: actions/setup-node@SHA_HERE  # vX.Y.Z
+        with:
+          node-version-file: ".nvmrc"   # matches the version the starter ships
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: actions/configure-pages@SHA_HERE  # vX.Y.Z
+
+      - name: Build with Eleventy
+        run: npx @11ty/eleventy
+
+      - uses: actions/upload-pages-artifact@SHA_HERE  # vX.Y.Z
+        with:
+          path: ./_site
+```
+
+The `deploy` job is unchanged. Unlike the Hugo build, there is no `--baseURL` flag — Eleventy reads the production URL from `_data/metadata.js` (set in Phase 4), so confirm that value is the custom domain.
 
 ### Enable Pages in repo settings
 
@@ -151,7 +194,7 @@ GitHub Pages does **not** require migrating DNS to a new provider. The user keep
 
 Push to `main` (or run the workflow via `workflow_dispatch`) and confirm the build **succeeds**. The site is published to a temporary Pages URL (`https://<user>.github.io/<repo>/`, or `https://<user>.github.io/` for a `<user>.github.io` repo).
 
-> **Expect the github.io preview to look unstyled, and don't treat that as a failure.** The build sets `baseURL` to the final custom domain (`https://example.com/`), so at the temporary github.io URL the CSS/JS and internal links point at the not-yet-live custom domain and won't resolve. This is normal and resolves itself once the custom domain is live (Step 4). For real **pre-DNS content verification** — that posts render and that the Medium-style aliases exist — use a local build instead (`hugo server` from Phase 3, or inspect the built `public/` for the alias redirect files). Full styling, alias redirects, and HTTPS are verified after the custom domain resolves in Step 5.
+> **Expect the github.io preview to look unstyled, and don't treat that as a failure.** The build sets `baseURL` to the final custom domain (`https://example.com/`), so at the temporary github.io URL the CSS/JS and internal links point at the not-yet-live custom domain and won't resolve. This is normal and resolves itself once the custom domain is live (Step 4). For real **pre-DNS content verification** — that posts render and that the Medium-style aliases exist — use a local build instead (Hugo: `hugo server`; Eleventy: `npx @11ty/eleventy --serve` — both from Phase 3, or inspect the build output, `public/` for Hugo or `_site/` for Eleventy, for the alias redirect stubs). Full styling, alias redirects, and HTTPS are verified after the custom domain resolves in Step 5.
 
 ### Step 2 — Set the custom domain
 
