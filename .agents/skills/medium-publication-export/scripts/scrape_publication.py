@@ -356,11 +356,12 @@ def extract_tags(soup):
     # 2) Apollo cache Tag objects ("Tag:<slug>": { ... "displayTitle": "..." }).
     if not tags:
         for script in soup.find_all("script"):
-            text = script.string or ""
+            text = script.get_text() or ""
             if '"Tag:' not in text:
                 continue
             for m in re.finditer(
-                r'"Tag:[^"]+":\{.{0,500}?"displayTitle":"([^"\\]+)"', text
+                r'"Tag:[^"]+":\{[\s\S]{0,500}?"displayTitle":"([^"\\]+)"',
+                text,
             ):
                 add(m.group(1))
             if tags:
