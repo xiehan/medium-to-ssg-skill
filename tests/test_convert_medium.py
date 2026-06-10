@@ -182,13 +182,15 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
 
     def setUp(self):
         self._prev = (cm.INPUT_DIR, cm.DOWNLOAD_IMAGES, cm.EXTRACT_TAGS)
-        self.tmp = tempfile.mkdtemp()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp = self._tmpdir.name
         cm.INPUT_DIR = self.tmp
         cm.DOWNLOAD_IMAGES = False
         cm.EXTRACT_TAGS = True
 
     def tearDown(self):
         cm.INPUT_DIR, cm.DOWNLOAD_IMAGES, cm.EXTRACT_TAGS = self._prev
+        self._tmpdir.cleanup()
 
     def test_front_matter_uses_slug(self):
         fn = write_export(self.tmp, "post.html")
