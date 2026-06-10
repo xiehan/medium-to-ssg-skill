@@ -1,0 +1,17 @@
+{
+  // Config for markdownlint-cli2. The Markdown *rule* set lives in
+  // .markdownlint.jsonc (cli2 reads and merges it automatically); this file
+  // only adds the ignore globs. Unlike the legacy markdownlint-cli,
+  // markdownlint-cli2 does NOT read .markdownlintignore, so paths to skip must
+  // be listed here. These are all generated or vendored output a contributor
+  // may produce by test-running a skill -- never hand-authored repo docs. CI
+  // checks out a clean tree where none of these exist, so this only affects
+  // local runs of the documented `markdownlint-cli2 "**/*.md"` command.
+  "ignores": [
+    "hugo-site/",
+    "themes/",
+    "work/",
+    "medium-export-out/",
+    "node_modules/"
+  ]
+}

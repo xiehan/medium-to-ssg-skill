@@ -30,12 +30,25 @@ body:
       label: What should happen instead?
     validations:
       required: true
+  - type: input
+    id: theme
+    attributes:
+      label: Hugo theme (if the bug involves the Hugo site)
+      description: >-
+        Many Hugo build/styling problems are theme-specific. If your issue
+        relates to scaffolding or building the Hugo site, name the theme and
+        link its repo (e.g. "Anatole — https://github.com/lxndrblz/anatole").
+        Leave blank if not relevant.
+      placeholder: Theme name — repo URL
+    validations:
+      required: false
   - type: textarea
     id: context
     attributes:
       label: Context
       description: >-
         Hosting path (AWS / GitHub Pages), infra method (Terraform / AWS CLI),
-        personal vs. publication export, OS, Hugo version — anything relevant.
+        personal vs. publication export, OS, Hugo version (incl. whether it's
+        the extended build) — anything relevant.
     validations:
       required: false

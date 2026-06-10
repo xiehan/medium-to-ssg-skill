@@ -14,7 +14,11 @@ migration-status.md
 work/
 
 # --- medium-to-ssg: generated Hugo site ------------------------------------
-# A test run scaffolds a Hugo project; these are its build/cache artifacts.
+# A test run scaffolds a Hugo project under hugo-site/ in the working directory;
+# the whole thing is generated output, so don't commit it from this repo.
+hugo-site/
+# Build/cache artifacts (also covered above, but listed in case a test run is
+# done from a different working directory).
 public/
 resources/
 .hugo_build.lock

@@ -5,11 +5,14 @@
 Before writing any config, fetch and read the chosen theme's README from its GitHub repository. Themes vary significantly in:
 - What config keys they expect in `hugo.toml`
 - What `params` they support
-- What `mainSections` or equivalent setting controls which content appears on the home page
+- What `mainSections` or equivalent setting controls which content appears on the home page (note whether it expects a singular or plural section name, e.g. `post` vs. `posts` — it must match your `content/` subdirectory or the home page will list nothing)
 - Whether they use Hugo Pipes, asset bundling, or just static files
+- Whether they require **Hugo Extended** (any theme that transpiles SCSS/SASS does)
 - What front matter fields they use (e.g. `description`, `summary`, `cover`, `tags`)
 
 Do not guess theme config. Read its README, then write `hugo.toml` accordingly.
+
+**Check the theme's Hugo version and build prerequisites before scaffolding.** Note the theme's minimum Hugo version (often declared as `min_version` in the theme's `theme.toml`) and whether it needs **Hugo Extended** — any theme that transpiles SCSS/SASS via Hugo Pipes (look for `toCSS` / `resources.Get "...scss"` in `layouts/partials/head.html`) requires the extended build, and newer themes may also need a Dart Sass binary. A plain (non-extended) Hugo, or one missing Dart Sass, aborts the build on the SCSS step with a `TOCSS`/transpiler error. Confirm the Hugo that will build the site — both locally and in CI — satisfies this (`hugo version` should show `+extended`) before continuing.
 
 ## Step 2 — Initialize the Hugo project structure
 
@@ -84,13 +87,13 @@ This is a placeholder. Replace this text with your home page content.
 
 ## Step 6 — Create assets/css/custom.css
 
-Most themes load a `custom.css` file from the assets directory automatically. Create it with a placeholder comment:
+Create a `custom.css` placeholder so the user has a clear place to add customizations without touching theme files:
 
 ```css
 /* Site-specific style overrides go here. */
 ```
 
-This gives the user a clear place to add customizations without touching theme files.
+**Do not assume the theme loads this file automatically — many do not.** Wire it up using the theme's documented mechanism (read the theme README). Some themes load custom CSS only when you register it explicitly in `hugo.toml` (e.g. Anatole expects `customCss = ["css/custom.css"]` under `[params]`), and several do so through Hugo Pipes with `resources.Get`, which **fails the entire build** if the path doesn't resolve to a real file under `assets/`. Use the exact asset-relative path the theme expects (e.g. `css/custom.css` for a file at `assets/css/custom.css`, not bare `custom.css`). If the theme has no custom-CSS hook, leave the file unreferenced rather than guessing a param name.
 
 ## Step 7 — Install the theme as a git submodule
 
