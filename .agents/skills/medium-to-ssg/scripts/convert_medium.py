@@ -32,6 +32,11 @@ the export HTML as <a class="p-category"> entries. When present, they are
 written to the Hugo front matter's `tags:` list. Set EXTRACT_TAGS = False to
 omit them.
 
+Raw HTML in prose: angle brackets that appear as text in a post (e.g. a literal
+<some-tag> mentioned in an article) are escaped to entities so Hugo's Goldmark
+renderer (which drops raw HTML by default) shows them instead of silently
+omitting the text. Inline code and fenced code blocks are kept verbatim.
+
 Requires: beautifulsoup4 (pip install beautifulsoup4)
           (image downloading uses only the Python standard library)
 """
@@ -319,10 +324,24 @@ def _wrap_inline(inner, prefix, suffix):
     return f"{lead}{prefix}{core}{suffix}{trail}"
 
 
+def _escape_md_text(text):
+    """Escape characters that would otherwise be parsed as raw HTML.
+
+    BeautifulSoup decodes HTML entities, so angle brackets that were escaped in
+    the Medium source (e.g. ``&lt;global-exception-mapping&gt;`` in prose) come
+    back as literal ``<`` / ``>``. Emitted as-is into Markdown, Goldmark treats
+    them as an HTML tag and — with the default ``unsafe = false`` renderer —
+    silently drops the text. Re-encoding them as entities makes Goldmark render
+    the literal characters. This is only applied to visible text nodes; inline
+    ``code`` and fenced ``pre`` blocks read their text directly and stay literal.
+    """
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def node_to_md(node):
     """Recursively convert a BeautifulSoup node to Markdown text."""
     if isinstance(node, str):
-        return node
+        return _escape_md_text(node)
 
     tag = node.name
 
@@ -343,7 +362,9 @@ def node_to_md(node):
     if tag == "br":
         return "\n"
     if tag == "code":
-        inner = "".join(node_to_md(c) for c in node.children)
+        # Read the literal text so inline code stays verbatim (no entity
+        # escaping); code spans render as-is in Markdown.
+        inner = node.get_text()
         return _wrap_inline(inner, "`", "`")
     if tag == "img":
         src = node.get("src") or node.get("data-src") or ""

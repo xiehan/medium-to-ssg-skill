@@ -65,6 +65,19 @@ mainSections = ["posts"]
 
 Ask the user to confirm the site title, their name, and description before writing this file.
 
+### Raw HTML in content (Goldmark `unsafe`)
+
+By default Hugo's Markdown renderer (Goldmark) runs with `unsafe = false`, which **silently drops raw HTML** found in content. `scripts/convert_medium.py` handles the common case for you: it escapes stray angle brackets in prose (e.g. a literal `<global-exception-mapping>` mentioned in an article) to entities so the text renders instead of disappearing, and it keeps inline code and fenced code blocks verbatim. So you usually do **not** need to enable `unsafe`.
+
+Only add the markup block below if a converted post legitimately needs raw HTML to pass through (for example a hand-written embed the converter didn't turn into a shortcode). Note some themes (e.g. Anatole) set this themselves, and enabling it sitewide means any raw HTML in any post is rendered as-is:
+
+```toml
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+```
+
 ## Step 4 — Configure the permalink structure
 
 The default permalink format for posts is `/posts/:slug/`. This means:
