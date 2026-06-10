@@ -37,6 +37,12 @@ multi-author pub:   medium-publication-export  ─►  ZIP  ─┘
 
 The rest of this README is about the `medium-to-ssg` skill. The publication-export skill has its own [SKILL.md](.agents/skills/medium-publication-export/SKILL.md) and reference docs.
 
+### A note on tags
+
+There's one catch worth knowing about if your posts have **tags** (Medium's topic labels). Medium's built-in **"Download your information"** export **does not include tags** — they're simply absent from the exported HTML, so a personal-export migration can't preserve them. The **[`medium-publication-export`](.agents/skills/medium-publication-export/SKILL.md)** skill, on the other hand, reads each post from its live page, where the tags *are* present, and carries them through to your Hugo front matter (`tags:`).
+
+This means tags are a reason to choose `medium-publication-export` **even for a single-author/personal blog**. It works just as well for one author as for a whole publication — point it at your own posts instead of a company blog. So if you have a personal blog **and** you care about keeping your tags, run `medium-publication-export` first to build the ZIP (it grabs the tags), then hand that ZIP to `medium-to-ssg`. If you don't care about tags, Medium's built-in export is the simpler path. Either way, the publication-export skill lets you **review your tags and drop ones you don't want** before migrating (for example, a publication-wide tag that's redundant on a self-hosted site, or a tag used on only one post) — see its [SKILL.md](.agents/skills/medium-publication-export/SKILL.md).
+
 ---
 
 ## What is an "agent skill"?

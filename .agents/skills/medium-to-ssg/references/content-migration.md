@@ -64,13 +64,19 @@ The script generates front matter in this format:
 ---
 title: "Post Title Here"
 date: 2024-01-15
+author: "Author Name"
 slug: "post-title-here"
 aliases:
   - /post-title-here-a1b2c3d4e5f6
+tags:
+  - "Engineering"
+  - "Open Source"
 ---
 ```
 
 The `slug` is the clean URL path under `/posts/`. The `aliases` value is the full Medium-style slug (title + hash), which Hugo will create a redirect page for automatically.
+
+`author:` and `tags:` are optional and only appear when the source provides them. A personal Medium "Download your information" export carries no tags, so `tags:` is omitted for those posts; content captured with the `medium-publication-export` skill recovers each post's topic tags and the converter writes them here. To omit tags even when they're available, set `EXTRACT_TAGS = False` at the top of `convert_medium.py`.
 
 ### Step 3 — Review each converted post
 
