@@ -220,6 +220,16 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn('permalink: "/posts/my-post/"', out)
         self.assertNotIn("slug:", out)
 
+    def test_eleventy_permalink_prefix_trailing_slash_no_double_slash(self):
+        # A custom PERMALINK_PREFIX with a trailing slash (as the docs show,
+        # e.g. "/archive/") must not produce a doubled slash in the permalink.
+        cm.SSG = "eleventy"
+        cm.PERMALINK_PREFIX = "/archive/"
+        fn = write_export(self.tmp, "post.html")
+        out = cm.convert_post(fn, "my-post")
+        self.assertIn('permalink: "/archive/my-post/"', out)
+        self.assertNotIn("//my-post", out)
+
     def test_date_comes_from_dt_published(self):
         cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", date_iso="2019-09-04T08:00:00.000Z")

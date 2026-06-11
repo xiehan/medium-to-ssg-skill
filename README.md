@@ -96,7 +96,7 @@ You'll need the following ready. The agent will ask you for them, so it helps to
 **Tools to have installed locally** (the agent can help you install/verify these):
 
 - [Hugo](https://gohugo.io/installation/) (extended version recommended) — **Hugo path only** (the default SSG)
-- [Node.js](https://nodejs.org/) **22 or newer** — **Eleventy path only** (the `eleventy-base-blog` starter needs Node 22+)
+- [Node.js](https://nodejs.org/) — **Eleventy path only**; install the version pinned by the `eleventy-base-blog` starter's `.nvmrc` (currently Node 22+)
 - [Git](https://git-scm.com/) — required for all paths
 - [Python 3](https://www.python.org/) with `beautifulsoup4` (`pip install beautifulsoup4`) — used by the content conversion script
 - [AWS CLI](https://aws.amazon.com/cli/), logged in (`aws configure`) — **AWS hosting only** (required for both AWS infrastructure methods). Not needed for GitHub Pages.
@@ -173,7 +173,7 @@ Before hosting, you pick the **static site generator (SSG)** that builds your si
 
 | | **Hugo** (default) | **Eleventy (11ty)** |
 |---|---|---|
-| **Toolchain** | A single Go binary | Node.js 22+ (npm) |
+| **Toolchain** | A single Go binary | Node.js (version per the starter's `.nvmrc`) + npm |
 | **Theming** | Large gallery at <https://themes.gohugo.io> | No gallery — scaffolded from the `eleventy-base-blog` starter; you own the templates |
 | **Build** | `hugo --minify` → `public/` | `npx @11ty/eleventy` → `_site/` |
 | **Old-URL redirects** | Built in via front-matter `aliases` | A small redirects collection + template the skill adds (same end result) |
@@ -445,7 +445,7 @@ eleventy-site/
 ├── content/redirects.njk       # Generates the old-Medium-URL redirect stubs
 ├── _data/metadata.js           # Site metadata, incl. the canonical base URL
 ├── eleventy.config.js          # Eleventy config (redirects collection + video shortcode)
-├── .nvmrc                      # Pins Node 22 for local + CI
+├── .nvmrc                      # Pins the Node version for local + CI
 └── public/                     # Passthrough static root (CNAME goes here for Pages)
 ```
 

@@ -12,7 +12,8 @@ Usage:
     5. Run: python3 convert_medium.py
 
 Images: by default, remote images (Medium's CDN and any other external image
-URLs) are downloaded into the Hugo static directory and the Markdown is
+URLs) are downloaded into the SSG's static/passthrough directory (STATIC_DIR)
+and the Markdown is
 rewritten to reference the local copy (e.g. /images/<file>), so the migrated
 site is self-contained and won't break when Medium's CDN goes away. Set
 DOWNLOAD_IMAGES = False to keep the original remote URLs instead. If an
@@ -53,6 +54,7 @@ import hashlib
 import mimetypes
 import os
 import re
+import sys
 import urllib.request
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -615,7 +617,10 @@ def convert_post(html_filename, clean_slug):
     # (Hugo emits the redirect stub from `aliases:`; on Eleventy a redirects
     # template consumes the same field — see references/eleventy-setup.md).
     if SSG == "eleventy":
-        url_line = f'permalink: "{PERMALINK_PREFIX}/{clean_slug}/"\n'
+        # Normalize the prefix so a trailing slash (e.g. "/archive/") doesn't
+        # produce a double slash in the permalink.
+        prefix = PERMALINK_PREFIX.rstrip("/")
+        url_line = f'permalink: "{prefix}/{clean_slug}/"\n'
     else:
         url_line = f'slug: "{clean_slug}"\n'
 
@@ -637,10 +642,10 @@ def convert_post(html_filename, clean_slug):
 def main():
     if SSG not in ("hugo", "eleventy"):
         print(f"ERROR: SSG must be \"hugo\" or \"eleventy\", not {SSG!r}.")
-        return
+        sys.exit(1)
     if not posts:
         print("ERROR: The `posts` list is empty. Edit convert_medium.py to add your posts.")
-        return
+        sys.exit(1)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -680,6 +685,7 @@ def main():
         print(f"\nErrors ({len(errors)}):")
         for filename, msg in errors:
             print(f"  {filename}: {msg}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # GitHub Pages Hosting Reference
 
-This is the **alternative to AWS** for users who want the lowest-cost, simplest setup and are willing to cede fine-grained control. GitHub builds and hosts the Hugo site for free (for public repositories), provisions HTTPS automatically, and serves a custom domain — with **no S3, CloudFront, ACM, Route 53, Terraform, or AWS account**.
+This is the **alternative to AWS** for users who want the lowest-cost, simplest setup and are willing to cede fine-grained control. GitHub builds and hosts your site for free (for public repositories), provisions HTTPS automatically, and serves a custom domain — with **no S3, CloudFront, ACM, Route 53, Terraform, or AWS account**.
 
 Use this path only when the hosting platform recorded in `migration-status.md` is `github-pages`. The content extraction/conversion (Phases 1–2) and site scaffolding (Phase 3) are identical to the AWS path; only hosting (Phase 4), deployment (Phase 5), and DNS cutover (Phases 6–7) differ.
 
