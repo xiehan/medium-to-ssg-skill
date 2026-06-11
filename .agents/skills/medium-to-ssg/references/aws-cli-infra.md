@@ -346,7 +346,7 @@ echo "Deployed. It can take a few minutes for the cache invalidation to complete
 > aws s3 sync dist/ "s3://$BUCKET/" --delete --cache-control "public, max-age=3600"
 > ```
 >
-> Requires the Node version the starter pins (its `package.json` `engines` / `.nvmrc`) on the machine running the script. `npm run build` runs the starter's `astro build` (plus any extra steps it wraps) — see "Adapting to a different starter" in `references/astro-setup.md`.
+> Requires the Node version the starter pins (its `package.json` `engines` / `.nvmrc`) on the machine running the script. `npm run build` runs the starter's `astro build` (plus any extra steps it wraps) — see "Adapting to a different starter" in `references/astro-setup.md`. If the theme's lockfile names pnpm or bun instead of npm, use that manager's build command (`pnpm run build` / `bun run build`) and make sure that manager is installed on the deploy machine.
 
 ---
 

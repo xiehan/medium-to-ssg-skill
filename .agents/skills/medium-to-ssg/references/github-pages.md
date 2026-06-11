@@ -212,6 +212,8 @@ For an **Astro** site, keep the `configure-pages` / `upload-pages-artifact` / `d
 
 The `deploy` job is unchanged. Like Eleventy there is no `--baseURL` flag — Astro reads the production URL from `site` in `astro.config.mjs` (set in Phase 4), so confirm that value is the custom domain. Pin `.nvmrc` to the Node version the starter's `engines` field requires (read it from the starter rather than hard-coding a number; see Step 2 in `references/astro-setup.md`). If the chosen starter wraps the build in extra steps, `npm run build` still runs them — see "Adapting to a different starter" in `references/astro-setup.md`.
 
+**If the theme's lockfile names pnpm or bun instead of npm**, swap the toolchain to match. For **pnpm**, add `pnpm/action-setup@SHA` *before* `actions/setup-node`, set the node step's `cache: pnpm`, and use `pnpm install --frozen-lockfile` / `pnpm run build`. For **bun**, add `oven-sh/setup-bun@SHA` and use `bun install --frozen-lockfile` / `bun run build`, keeping `actions/setup-node` so Astro's `engines` floor is satisfied (a bun-only theme like erudite ships no `.nvmrc`, so pin a concrete `node-version:` rather than `node-version-file`). Pin any added action to a commit SHA like the rest — see "Install with the package manager the theme's lockfile names" in `references/astro-setup.md`.
+
 ### Enable Pages in repo settings
 
 Before the first deploy succeeds, the repo's **Settings → Pages → Build and deployment → Source** must be set to **GitHub Actions** (not "Deploy from a branch"). Tell the user to set this; it cannot be done from the workflow.
