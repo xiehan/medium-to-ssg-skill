@@ -237,5 +237,51 @@ class BuildExportHtmlTests(unittest.TestCase):
         self.assertIn("A &amp; B &lt;c&gt;", out)
 
 
+class NormalizeBodyImageTests(unittest.TestCase):
+    """Article images survive Medium's interactive image wrapper.
+
+    On a live Medium page each image sits in a ``role="button"`` "click to view
+    in full size" container, and the ``<img>`` itself carries no ``src`` — the
+    URL is in the sibling ``<picture>``'s ``<source srcset>``. Blanket-removing
+    ``role="button"`` elements used to delete the whole figure, so this pins
+    that the image is promoted to a clean ``<img src>`` instead.
+    """
+
+    # Mirrors the live Medium structure: figure > role=button wrapper >
+    # hidden prompt span + picture(source srcset, img without src) + figcaption.
+    FIGURE = (
+        '<figure class="paragraph-image">'
+        '<div role="button" tabindex="0">'
+        '<span aria-hidden="false">Press enter or click to view image in full size</span>'
+        '<div><picture>'
+        '<source srcset="https://miro.medium.com/v2/resize:fit:640/x.png 640w, '
+        'https://miro.medium.com/v2/resize:fit:2000/x.png 2000w">'
+        '<img alt="A diagram" width="1000" height="528" role="presentation">'
+        '</picture></div></div>'
+        "<figcaption>A diagram</figcaption></figure>"
+    )
+
+    def test_role_button_wrapped_image_is_recovered(self):
+        out = sp.normalize_body(soup(self.FIGURE), "Some Title")
+        result = soup(out)
+        img = result.find("img")
+        self.assertIsNotNone(img, "the wrapped image must survive")
+        self.assertEqual(img["src"], "https://miro.medium.com/v2/resize:fit:2000/x.png")
+        self.assertEqual(img["alt"], "A diagram")
+        self.assertIsNotNone(result.find("figcaption"))
+
+    def test_interactive_chrome_is_not_leaked(self):
+        out = sp.normalize_body(soup(self.FIGURE), "Some Title")
+        self.assertNotIn("view image in full size", out.lower())
+        self.assertNotIn("role=\"button\"", out)
+
+    def test_image_free_button_is_still_removed(self):
+        # A role="button" with no image (real UI chrome) must still be stripped.
+        html = '<div><div role="button">Follow</div><p>Real text.</p></div>'
+        out = sp.normalize_body(soup(html), "Some Title")
+        self.assertNotIn("Follow", out)
+        self.assertIn("Real text.", out)
+
+
 if __name__ == "__main__":
     unittest.main()

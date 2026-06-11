@@ -573,7 +573,11 @@ def node_to_md(node):
             caption = node.find("figcaption")
             md = f"\n\n![{alt}]({src})\n\n"
             if caption:
-                caption_text = caption.get_text(strip=True)
+                # Collapse internal whitespace without gluing words together.
+                # ``get_text(strip=True)`` strips each text segment, so a caption
+                # with inline markup (e.g. "the <a>site</a> interface") would
+                # lose the spaces around the link ("thesiteinterface").
+                caption_text = " ".join(caption.get_text().split())
                 if caption_text:
                     md += f"_{caption_text}_\n\n"
             return md

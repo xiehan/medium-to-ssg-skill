@@ -497,9 +497,39 @@ def _best_img_src(img):
     return ""
 
 
+def _rescue_wrapped_images(soup):
+    """Promote article images out of Medium's interactive wrappers.
+
+    Medium wraps each article image in a ``role="button"`` container (the
+    "Press enter or click to view image in full size" affordance), and the
+    ``<img>`` itself often carries no ``src`` — the real URL lives in the
+    sibling ``<picture>``'s ``<source srcset>``. The blanket removal of
+    ``role="button"`` / ``aria-hidden="true"`` elements in ``normalize_body``
+    would delete the whole wrapper, taking the image with it. To prevent that,
+    any such wrapper that contains a resolvable image is replaced up front with
+    a clean ``<img src alt>`` (discarding the interactive chrome), so the later
+    strip passes only remove genuinely image-free wrappers.
+    """
+    for el in (soup.find_all(attrs={"role": "button"})
+               + soup.find_all(attrs={"aria-hidden": "true"})):
+        if el.parent is None:
+            continue  # already detached by an outer wrapper's replacement
+        img = el.find("img")
+        if img is None:
+            continue
+        src = _best_img_src(img)
+        if not src:
+            continue
+        el.replace_with(soup.new_tag("img", src=src, alt=img.get("alt", "")))
+
+
 def normalize_body(container, title):
     """Strip non-content cruft and reduce to the converter's HTML subset."""
     soup = BeautifulSoup(str(container), "html.parser")
+
+    # Rescue images from interactive wrappers before the chrome strip below
+    # would otherwise decompose them along with their role="button" container.
+    _rescue_wrapped_images(soup)
 
     for tag in soup.find_all(JUNK_TAGS):
         tag.decompose()

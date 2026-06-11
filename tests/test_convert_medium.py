@@ -262,6 +262,19 @@ class FigureAndImageTests(unittest.TestCase):
         self.assertIn("![cat](https://img.example.com/x.png)", out)
         self.assertIn("_A cat_", out)
 
+    def test_figure_caption_with_inline_link_keeps_spaces(self):
+        # A figcaption with inline markup must not lose the spaces around it;
+        # get_text(strip=True) used to glue words to the link ("thesiteinterface").
+        out = md(
+            '<figure><img src="https://img.example.com/x.png" alt="">'
+            '<figcaption>A screenshot of the '
+            '<a href="https://omnystudio.com">omnystudio.com</a> '
+            "interface, in action.</figcaption></figure>"
+        )
+        self.assertIn(
+            "_A screenshot of the omnystudio.com interface, in action._", out
+        )
+
     def test_figure_iframe_video_hugo_shortcode(self):
         out = md(
             '<figure><iframe src="https://youtube.com/embed/x"></iframe></figure>',
