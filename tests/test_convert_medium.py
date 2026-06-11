@@ -345,9 +345,10 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertNotIn("//my-post", out)
 
     def test_astro_front_matter_uses_slug_and_pubdate(self):
-        # Astro derives /posts/<slug>/ from `slug:` (content-collection id) like
-        # Hugo, but names the publish date `pubDate` (its Zod schema's field),
-        # not `date`, and never emits Eleventy's `permalink:`.
+        # Astro derives /posts/<slug>/ from the content entry's id (the output
+        # filename), not the `slug:` field — the converter still emits `slug:`
+        # for parity with Hugo. Astro names the publish date `pubDate` (its Zod
+        # schema's field), not `date`, and never emits Eleventy's `permalink:`.
         cm.SSG = "astro"
         fn = write_export(self.tmp, "post.html", date_iso="2019-09-04T08:00:00.000Z")
         out = cm.convert_post(fn, "my-post")

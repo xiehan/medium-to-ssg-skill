@@ -36,7 +36,7 @@ To get the canonical Medium URL for each post, look for:
 <a class="p-canonical" href="https://...">
 ```
 
-Note any posts that contain `<iframe>` elements (these need a video shortcode). You do not need to track `<img>` tags by hand — the conversion script in Part 2 downloads remote images and rewrites their references automatically.
+Note any posts that contain `<iframe>` elements (the converter turns these into a video embed — a `video` shortcode on Hugo and Eleventy, raw responsive `<iframe>` HTML on Astro). You do not need to track `<img>` tags by hand — the conversion script in Part 2 downloads remote images and rewrites their references automatically.
 
 ### Step 4 — Embedded images (handled automatically)
 
@@ -99,7 +99,7 @@ Open each output `.md` file and verify:
 
 ### Step 4 — Handle embedded media
 
-If a post contains an `<iframe>` (e.g. a YouTube or Vimeo embed), the script converts it to a video shortcode whose syntax depends on `SSG`.
+If a post contains an `<iframe>` (e.g. a YouTube or Vimeo embed), the script converts it to a video embed whose form depends on `SSG`.
 
 **Hugo** emits:
 

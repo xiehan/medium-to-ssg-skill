@@ -83,7 +83,7 @@ Two settings must agree across the converter and the Astro project, or posts wil
 | Concept | Converter setting | Astro side |
 |---|---|---|
 | Where the `.md` files are written | `OUTPUT_DIR` | the content collection directory (blog starter: `src/content/blog/`) |
-| The canonical post URL prefix | `PERMALINK_PREFIX` (default `/posts`) | the route directory under `src/pages/` |
+| The canonical post URL prefix | *(none — Astro ignores `PERMALINK_PREFIX`)* | the route directory under `src/pages/` |
 
 Set the converter's `OUTPUT_DIR = "astro-site/src/content/blog"` so converted posts land in the starter's `blog` content collection.
 
@@ -99,7 +99,7 @@ mv src/pages/blog src/pages/posts
 grep -rl '/blog' src/        # find nav links, the listing page, and cards that hard-code /blog/
 ```
 
-Update every `/blog` reference the `grep` finds (the header nav, the post listing page, and any "read more" link in a card/layout) to `/posts`. The dynamic route file itself needs no change — it already maps `params: { slug: post.id }`, so after the move it emits `/posts/<id>/`. If the user wants a different prefix (e.g. `/archive/`), name the route directory `src/pages/archive/` instead and set the converter's `PERMALINK_PREFIX` to match **before** running it (the prefix also feeds the redirect targets in Step 7).
+Update every `/blog` reference the `grep` finds (the header nav, the post listing page, and any "read more" link in a card/layout) to `/posts`. The dynamic route file itself needs no change — it already maps `params: { slug: post.id }`, so after the move it emits `/posts/<id>/`. If the user wants a different prefix (e.g. `/archive/`), name the route directory `src/pages/archive/` instead and update the redirect-route `target` in Step 7 to match (`/archive/<id>/`). The converter's `PERMALINK_PREFIX` has no effect on the Astro path — the route directory alone controls the prefix.
 
 ### Relax the content-collection schema
 

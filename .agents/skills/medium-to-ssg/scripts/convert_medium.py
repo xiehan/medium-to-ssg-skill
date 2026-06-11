@@ -698,14 +698,15 @@ def convert_post(html_filename, clean_slug):
             tags_block = f"tags:\n{items}"
 
     # Canonical URL: Hugo derives /posts/<slug>/ from `slug:` + hugo.toml's
-    # [permalinks]; Astro derives it from `slug:` too (the field overrides a
-    # content-collection entry's id, which the `/posts/[...id]` route maps to
-    # /posts/<slug>/). Eleventy has no such central map, so write an explicit
-    # `permalink:`. The Medium-style slug is preserved as an alias on every SSG
-    # (Hugo emits the redirect stub from `aliases:`; on Eleventy a redirects
-    # template consumes the same field, and on Astro the `redirects` config in
-    # astro.config.mjs does — see references/eleventy-setup.md and
-    # references/astro-setup.md).
+    # [permalinks]. Astro derives it from the content entry's id (the output
+    # filename, which the converter names <clean_slug>.md), so the route maps
+    # it to /posts/<clean_slug>/; the `slug:` field below is written only for
+    # parity with Hugo and does not drive Astro routing. Eleventy has no such
+    # central map, so write an explicit `permalink:`. The Medium-style slug is
+    # preserved as an alias on every SSG (Hugo emits the redirect stub from
+    # `aliases:`; on Eleventy a redirects template consumes the same field, and
+    # on Astro a catch-all route reads `aliases` from the content collection —
+    # see references/eleventy-setup.md and references/astro-setup.md).
     if SSG == "eleventy":
         # Normalize the prefix so a trailing slash (e.g. "/archive/") doesn't
         # produce a double slash in the permalink.
@@ -734,8 +735,8 @@ def convert_post(html_filename, clean_slug):
 
 
 def main():
-    if SSG not in ("hugo", "eleventy"):
-        print(f"ERROR: SSG must be \"hugo\" or \"eleventy\", not {SSG!r}.")
+    if SSG not in ("hugo", "eleventy", "astro"):
+        print(f"ERROR: SSG must be \"hugo\", \"eleventy\", or \"astro\", not {SSG!r}.")
         sys.exit(1)
     if not posts:
         print("ERROR: The `posts` list is empty. Edit convert_medium.py to add your posts.")
