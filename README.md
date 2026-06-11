@@ -184,6 +184,7 @@ Before hosting, you pick the **static site generator (SSG)** that builds your si
 
 - You want the **simplest, fastest** path with no Node toolchain.
 - You'd rather **choose a ready-made theme** than build templates.
+- Your blog is no longer actively updated / archival content, so you want a **set-it-and-forget-it** repo where you don't have to maintain dependencies over time.
 - You're not sure — it's the default and recommended choice.
 
 ### Pick **Eleventy** if…
