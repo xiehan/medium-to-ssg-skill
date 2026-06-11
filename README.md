@@ -25,6 +25,18 @@ You don't run a single big script. Instead, you **talk to an AI agent**, and the
 
 ---
 
+## What is an "agent skill"?
+
+If you're new to skills, here's the short version:
+
+- A **skill** is a folder of instructions (Markdown) plus helper files (scripts, reference docs) that teaches an AI agent how to do a specialized task really well.
+- The agent **automatically loads the skill** when your request matches what the skill is for. You don't call it like a command — you just describe what you want in plain English.
+- The main file the agent reads is [`.agents/skills/medium-to-ssg/SKILL.md`](.agents/skills/medium-to-ssg/SKILL.md). It tells the agent its role, the inputs to collect, and the 7 phases to follow.
+
+You interact with the skill simply by **chatting with your agent** in a workspace where this skill is available.
+
+---
+
 ## Two scenarios: personal blog vs. publication
 
 How you get your content out of Medium depends on who wrote it.
@@ -36,7 +48,7 @@ In other words:
 
 ```
 personal blog:      Medium "Download your information"  ─┐
-                                                         ├─►  medium-to-ssg  ─►  Hugo or Eleventy site
+                                                         ├─►  medium-to-ssg  ─►  Static site
 multi-author pub:   medium-publication-export  ─►  ZIP  ─┘
 ```
 
@@ -47,18 +59,6 @@ The rest of this README is about the `medium-to-ssg` skill. The publication-expo
 There's one catch worth knowing about if your posts have **tags** (Medium's topic labels). Medium's built-in **"Download your information"** export **does not include tags** — they're simply absent from the exported HTML, so a personal-export migration can't preserve them. The **[`medium-publication-export`](.agents/skills/medium-publication-export/SKILL.md)** skill, on the other hand, reads each post from its live page, where the tags *are* present, and carries them through to your generated front matter (`tags:`).
 
 This means tags are a reason to choose `medium-publication-export` **even for a single-author/personal blog**. It works just as well for one author as for a whole publication — point it at your own posts instead of a company blog. So if you have a personal blog **and** you care about keeping your tags, run `medium-publication-export` first to build the ZIP (it grabs the tags), then hand that ZIP to `medium-to-ssg`. If you don't care about tags, Medium's built-in export is the simpler path. Either way, the publication-export skill lets you **review your tags and drop ones you don't want** before migrating (for example, a publication-wide tag that's redundant on a self-hosted site, or a tag used on only one post) — see its [SKILL.md](.agents/skills/medium-publication-export/SKILL.md).
-
----
-
-## What is an "agent skill"?
-
-If you're new to skills, here's the short version:
-
-- A **skill** is a folder of instructions (Markdown) plus helper files (scripts, reference docs) that teaches an AI agent how to do a specialized task really well.
-- The agent **automatically loads the skill** when your request matches what the skill is for. You don't call it like a command — you just describe what you want in plain English.
-- The main file the agent reads is [`.agents/skills/medium-to-ssg/SKILL.md`](.agents/skills/medium-to-ssg/SKILL.md). It tells the agent its role, the inputs to collect, and the 7 phases to follow.
-
-You interact with the skill simply by **chatting with your agent** in a workspace where this skill is available.
 
 ---
 
