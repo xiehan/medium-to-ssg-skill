@@ -333,6 +333,8 @@ echo "Deployed. It can take a few minutes for the cache invalidation to complete
 > # 2. Sync to S3 (Eleventy builds into _site/, not public/)
 > aws s3 sync _site/ "s3://$BUCKET/" --delete --cache-control "public, max-age=3600"
 > ```
+>
+> The `npx @11ty/eleventy` build matches the `eleventy-base-blog` starter; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
 
 ---
 
