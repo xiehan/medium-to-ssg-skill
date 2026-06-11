@@ -376,7 +376,7 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn(fn, str(ctx.exception))
         self.assertIn("draft", str(ctx.exception).lower())
 
-    def test_alias_preserves_medium_slug_on_both_ssgs(self):
+    def test_alias_preserves_medium_slug_on_all_ssgs(self):
         for ssg in ("hugo", "eleventy", "astro"):
             cm.SSG = ssg
             fn = write_export(self.tmp, "post.html")

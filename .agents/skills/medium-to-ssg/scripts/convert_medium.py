@@ -83,8 +83,9 @@ SSG = "hugo"
 
 # Canonical URL prefix for posts; must match the site's permalink config (Hugo's
 # [permalinks] / Eleventy's permalink). Used to build the Eleventy `permalink:`
-# field. Hugo derives the path from `slug:` + hugo.toml, and Astro from `slug:`
-# + its `/posts/[...id]` route, so this is unused on those two.
+# field. Hugo derives the path from `slug:` + hugo.toml; Astro derives it from
+# the content entry id (the filename) plus its `/posts/[...id]` route directory,
+# not from `slug:`, so this is unused on those two.
 PERMALINK_PREFIX = "/posts"
 
 INPUT_DIR = "work/medium-posts"    # Directory containing extracted HTML files
