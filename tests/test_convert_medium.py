@@ -74,11 +74,41 @@ def write_export(tmpdir, filename, *, title="My Post", body="<p>Hello world.</p>
 class InlineFormattingTests(unittest.TestCase):
     def test_bold_and_italic(self):
         self.assertEqual(md("<strong>hi</strong>"), "**hi**")
-        self.assertEqual(md("<em>hi</em>"), "*hi*")
+        self.assertEqual(md("<em>hi</em>"), "_hi_")
 
     def test_boundary_whitespace_moves_outside_markers(self):
         # "* text *" is not valid emphasis; the space must move outside.
         self.assertEqual(md("<strong> hi </strong>"), " **hi** ")
+
+    def test_bold_italic_adjacent_to_italic_does_not_collide(self):
+        # Medium emits an "Editor's note:" lede as bold-italic directly against a
+        # following italic sibling. Using ``*`` for italic would merge the
+        # delimiters into ``***X****: Y*`` (a run of four asterisks) that renders
+        # as stray literal ``*``. Underscore italic keeps the runs separate.
+        out = md(
+            "<p><strong><em>Editor’s note</em></strong>"
+            "<em>: it was sunset.</em></p>"
+        ).strip()
+        self.assertEqual(out, "**_Editor’s note_**_: it was sunset._")
+        self.assertNotIn("***", out)
+        self.assertNotIn("****", out)
+
+    def test_emphasis_wrapping_only_punctuation_is_unwrapped(self):
+        # Medium sometimes wraps a lone stray smart quote in <strong>/<em>
+        # (a copy-paste artifact). Emitting the markers would leave dangling
+        # ``**``/``_`` flanking punctuation that render as literal characters,
+        # so emphasis with no word character is unwrapped to the bare text.
+        self.assertEqual(
+            md("<p><strong>“</strong>I love working</p>").strip(), "“I love working"
+        )
+        self.assertEqual(md("<p><em>“</em>quoted</p>").strip(), "“quoted")
+        # Real emphasis (has a word character) is still wrapped.
+        self.assertEqual(md("<p><strong>!</strong> wait</p>").strip(), "! wait")
+        self.assertEqual(md("<strong>Hi!</strong>"), "**Hi!**")
+
+    def test_code_span_of_only_punctuation_keeps_markers(self):
+        # Code is not emphasis: punctuation-only code spans must stay wrapped.
+        self.assertEqual(md("<code>=&gt;</code>"), "`=>`")
 
     def test_link(self):
         self.assertEqual(
@@ -108,6 +138,65 @@ class MalformedLinkTests(unittest.TestCase):
     def test_mangled_link_is_repaired_in_output(self):
         out = md('<a href="http://%28https://example.com%29">site</a>')
         self.assertEqual(out, "[site](https://example.com)")
+
+
+class LinkCardTests(unittest.TestCase):
+    """Medium embeds a link to another article as an <a> wrapping block content.
+
+    Rendering the anchor's heading/subtitle/label children as inline link text
+    produced broken Markdown (``#`` markup and newlines inside ``[...]``). Such
+    cards must collapse to a single plain link using the card's title.
+    """
+
+    CARD = (
+        '<a href="/google-i-o-retrospective-f0c40ef9aef9?source=post_page'
+        '-----ee585a4b3df7---------------------------------------">'
+        "<div><div><h2>Google I/O retrospective</h2>"
+        "<div><h3>It's been two weeks since Google I/O and my brain is "
+        "more or less defrag'd.</h3></div>"
+        "<div><p>npr.codes</p></div></div></div></a>"
+    )
+
+    def test_card_collapses_to_single_plain_link(self):
+        out = md(self.CARD).strip()
+        self.assertEqual(
+            out, "[Google I/O retrospective](/google-i-o-retrospective-f0c40ef9aef9)"
+        )
+
+    def test_card_output_has_no_heading_markup_or_internal_newlines(self):
+        out = md(self.CARD).strip()
+        self.assertNotIn("#", out)
+        self.assertNotIn("\n", out)
+
+    def test_source_tracking_query_is_stripped(self):
+        self.assertEqual(
+            cm._strip_tracking_query(
+                "/post-abc123?source=post_page-----deadbeef---------"
+            ),
+            "/post-abc123",
+        )
+
+    def test_non_tracking_query_is_preserved(self):
+        self.assertEqual(
+            cm._strip_tracking_query("/search?q=hello"),
+            "/search?q=hello",
+        )
+
+    def test_ordinary_inline_link_is_unaffected(self):
+        # A link with no heading is not a card and keeps its inline behavior.
+        self.assertEqual(
+            md('<a href="https://example.com">read <em>this</em></a>'),
+            "[read _this_](https://example.com)",
+        )
+
+    def test_inline_mention_link_tracking_query_is_stripped(self):
+        # Medium @-mention links carry a ?source=post_page---user_mention--...
+        # tracking suffix that must be stripped from ordinary inline links too.
+        out = md(
+            '<a href="https://medium.com/u/12121674465f?source=post_page'
+            '---user_mention--7bd8411a12a7----0----------------">Bina Zafar</a>'
+        )
+        self.assertEqual(out, "[Bina Zafar](https://medium.com/u/12121674465f)")
 
 
 class RawHtmlEscapingTests(unittest.TestCase):
@@ -171,7 +260,7 @@ class FigureAndImageTests(unittest.TestCase):
             "<figcaption>A cat</figcaption></figure>"
         )
         self.assertIn("![cat](https://img.example.com/x.png)", out)
-        self.assertIn("*A cat*", out)
+        self.assertIn("_A cat_", out)
 
     def test_figure_iframe_video_hugo_shortcode(self):
         out = md(

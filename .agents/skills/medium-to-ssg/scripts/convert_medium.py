@@ -343,11 +343,22 @@ def _split_edge_ws(text):
     return lead, stripped, trail
 
 
-def _wrap_inline(inner, prefix, suffix):
-    """Wrap inner content in inline markers, preserving boundary whitespace."""
+def _wrap_inline(inner, prefix, suffix, is_emphasis=False):
+    """Wrap inner content in inline markers, preserving boundary whitespace.
+
+    When ``is_emphasis`` is set and the content has no word character (it is
+    only punctuation, symbols, or whitespace), the markers are dropped and the
+    bare text is returned. Medium occasionally wraps a lone stray character such
+    as a smart quote in ``<strong>``/``<em>`` — a copy-paste artifact, not real
+    emphasis — which would otherwise emit dangling ``**``/``_`` that flank
+    punctuation and render as literal marker characters. Code spans
+    (``is_emphasis=False``) keep their markers so punctuation-only code is intact.
+    """
     lead, core, trail = _split_edge_ws(inner)
     if not core:
         return ""
+    if is_emphasis and not re.search(r"\w", core):
+        return f"{lead}{core}{trail}"
     return f"{lead}{prefix}{core}{suffix}{trail}"
 
 
@@ -424,6 +435,48 @@ def _pre_text(node):
     return text.strip("\n")
 
 
+def _is_link_card(node):
+    """Return True if an ``<a>`` wraps a heading — a Medium "link card".
+
+    Medium embeds a link to another article as an ``<a>`` that wraps block-level
+    content: a heading title, a subtitle, and a domain label. Rendering those
+    block children as inline link text produces broken Markdown (``#`` markup
+    and newlines inside ``[...]``), so such anchors are collapsed to one plain
+    link. A heading inside an anchor is the reliable signal of this layout;
+    ordinary inline links never contain one.
+    """
+    return node.find(["h1", "h2", "h3", "h4", "h5", "h6"]) is not None
+
+
+def _link_card_title(node):
+    """The link text for a Medium link card: its heading, else its first line."""
+    heading = node.find(["h1", "h2", "h3", "h4", "h5", "h6"])
+    text = heading.get_text(strip=True) if heading else ""
+    if not text:
+        for line in node.get_text("\n", strip=True).split("\n"):
+            if line.strip():
+                text = line.strip()
+                break
+    return text
+
+
+def _strip_tracking_query(href):
+    """Drop Medium's ``?source=…`` tracking query from a link target.
+
+    Medium appends a ``?source=…`` analytics suffix to the links it emits:
+    ``post_page-----<hash>---…`` on article link cards, and
+    ``post_page---user_mention--<hash>----…`` on inline @-mention links. The
+    suffix is pure tracking cruft — the bare path (``/post-title-<hash>``) is
+    what the generated alias redirect stubs resolve, and mention links still
+    reach the right profile without it — so it is stripped from every link.
+    Non-tracking queries (anything not beginning ``source=``) are preserved.
+    """
+    base, sep, query = href.partition("?")
+    if sep and query.startswith("source="):
+        return base
+    return href
+
+
 def node_to_md(node):
     """Recursively convert a BeautifulSoup node to Markdown text."""
     if isinstance(node, str):
@@ -434,13 +487,26 @@ def node_to_md(node):
     # Inline elements
     if tag in ("strong", "b"):
         inner = "".join(node_to_md(c) for c in node.children)
-        return _wrap_inline(inner, "**", "**")
+        return _wrap_inline(inner, "**", "**", is_emphasis=True)
     if tag in ("em", "i"):
         inner = "".join(node_to_md(c) for c in node.children)
-        return _wrap_inline(inner, "*", "*")
+        # Italic uses ``_`` rather than ``*`` so its delimiters never merge with
+        # an adjacent bold run. Medium emits bold-italic as nested tags directly
+        # against a following italic sibling (e.g. an "Editor's note:" lede:
+        # ``<strong><em>X</em></strong><em>: Y</em>``). With ``*`` for both, that
+        # produces a run of four asterisks (``***X****: Y*``) that CommonMark
+        # mis-parses into stray literal ``*`` characters; ``**_X_**_: Y_`` does
+        # not. Underscore and asterisk delimiters can sit flush without colliding.
+        return _wrap_inline(inner, "_", "_", is_emphasis=True)
     if tag == "a":
+        href = _strip_tracking_query(_clean_href(node.get("href", "")))
+        if _is_link_card(node):
+            # Medium link card (an <a> wrapping a heading/subtitle/label):
+            # collapse the block layout to a single plain link so it doesn't
+            # emit heading markup and newlines inside the link text.
+            title = _escape_md_text(_link_card_title(node))
+            return f"\n\n[{title}]({href})\n\n" if title and href else ""
         inner = "".join(node_to_md(c) for c in node.children)
-        href = _clean_href(node.get("href", ""))
         if not inner.strip():
             return ""
         lead, core, trail = _split_edge_ws(inner)
@@ -509,7 +575,7 @@ def node_to_md(node):
             if caption:
                 caption_text = caption.get_text(strip=True)
                 if caption_text:
-                    md += f"*{caption_text}*\n\n"
+                    md += f"_{caption_text}_\n\n"
             return md
         return ""
 
