@@ -4,3 +4,4 @@
 *.md linguist-detectable=true
 
 README.md linguist-documentation=true
+.github/*.md linguist-detectable=false
