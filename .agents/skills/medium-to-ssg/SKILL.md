@@ -277,11 +277,11 @@ eleventy-site/
 **If hosting platform is `aws` and infrastructure method is `aws-cli`:**
 
 ```
-<site>/                      # hugo-site/ or eleventy-site/
+<site>/                         # hugo-site/ or eleventy-site/
 ├── infra/
 │   ├── 00-config.sh            # shared variables (domain, region, repo)
 │   ├── 01-s3.sh                # private bucket + public access block
-│   ├── 02-acm.sh              # request ACM cert in us-east-1
+│   ├── 02-acm.sh               # request ACM cert in us-east-1
 │   ├── 03-route53-zone.sh      # create hosted zone, print nameservers
 │   ├── 04-acm-validation.sh    # add ACM validation records to the zone
 │   ├── 05-cloudfront.sh        # OAC, CloudFront Function, distribution, bucket policy
@@ -302,8 +302,8 @@ For an **Eleventy** site, create `.github/dependabot.yml` with a `package-ecosys
 **If hosting platform is `github-pages`:**
 
 ```
-<site>/                      # hugo-site/ or eleventy-site/
-├── static/                  # Hugo; for Eleventy the CNAME goes in public/ instead
+<site>/                         # hugo-site/ or eleventy-site/
+├── static/                     # Hugo; for Eleventy the CNAME goes in public/ instead
 │   └── CNAME                   # contains the apex domain (e.g. example.com)
 └── .github/
     ├── workflows/
