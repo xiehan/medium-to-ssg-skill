@@ -37,7 +37,7 @@ Use `provider = aws.us_east_1` on `aws_acm_certificate` and `aws_acm_certificate
 1. `www.example.com` → `example.com` permanent redirect (301)
 2. Directory requests (`/path/`) → `/path/index.html` rewrite (required because CloudFront's `default_root_object` only applies to the root `/`)
 
-**403 = 404**: Because the bucket is private, S3 returns 403 (not 404) for missing objects. Map both 403 and 404 to the site's `404.html` in the CloudFront `custom_error_response` blocks (both Hugo and the `eleventy-base-blog` starter emit a `404.html` at the build-output root).
+**403 = 404**: Because the bucket is private, S3 returns 403 (not 404) for missing objects. Map both 403 and 404 to the site's `404.html` in the CloudFront `custom_error_response` blocks (Hugo, the `eleventy-base-blog` starter, and the Astro `blog` starter each emit a `404.html` at the build-output root).
 
 **default_tags**: Apply a `domain` tag to all resources via `default_tags` on both provider configurations. This enables per-domain cost tracking via AWS Cost Explorer and the Budget filter.
 
@@ -513,7 +513,7 @@ Generate this file with all three options documented so the user can choose. Loc
 
 ## .gitignore additions
 
-The `.gitignore` created in Phase 3 (`references/hugo-setup.md` for Hugo, `references/eleventy-setup.md` for Eleventy) only covers the SSG build outputs. When the infrastructure method is Terraform, **append** the following Terraform entries to the project root `.gitignore` so local state, the provider cache, and any secret-bearing variable files are never committed:
+The `.gitignore` created in Phase 3 (`references/hugo-setup.md` for Hugo, `references/eleventy-setup.md` for Eleventy, `references/astro-setup.md` for Astro) only covers the SSG build outputs. When the infrastructure method is Terraform, **append** the following Terraform entries to the project root `.gitignore` so local state, the provider cache, and any secret-bearing variable files are never committed:
 
 ```gitignore
 # Terraform

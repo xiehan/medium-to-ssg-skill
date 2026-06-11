@@ -304,7 +304,7 @@ After creating the role, note its ARN — it becomes the `AWS_ROLE_ARN` GitHub s
 
 ## `infra/deploy.sh` — build + deploy content (the set-and-forget default)
 
-For users who don't want GitHub Actions, this is how they publish the site (and republish on the rare occasion they edit a post). Run it from the SSG project root — `hugo-site/` for Hugo, `eleventy-site/` for Eleventy.
+For users who don't want GitHub Actions, this is how they publish the site (and republish on the rare occasion they edit a post). Run it from the SSG project root — `hugo-site/` for Hugo, `eleventy-site/` for Eleventy, `astro-site/` for Astro.
 
 ```bash
 #!/usr/bin/env bash
@@ -335,6 +335,18 @@ echo "Deployed. It can take a few minutes for the cache invalidation to complete
 > ```
 >
 > The `npx @11ty/eleventy` build matches the `eleventy-base-blog` starter; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
+>
+> **Astro variant:** same shape — build with `npm run build` and sync `dist/` (not `public/`); step 3 is unchanged:
+>
+> ```bash
+> # 1. Build (run from astro-site/)
+> npm run build
+>
+> # 2. Sync to S3 (Astro builds into dist/, not public/)
+> aws s3 sync dist/ "s3://$BUCKET/" --delete --cache-control "public, max-age=3600"
+> ```
+>
+> Requires the Node version the starter pins (its `package.json` `engines` / `.nvmrc`) on the machine running the script. `npm run build` runs the starter's `astro build` (plus any extra steps it wraps) — see "Adapting to a different starter" in `references/astro-setup.md`.
 
 ---
 

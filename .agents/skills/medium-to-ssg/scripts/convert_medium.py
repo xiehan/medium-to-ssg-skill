@@ -1,14 +1,15 @@
 """
-convert_medium.py — Convert Medium HTML export files to Hugo or Eleventy Markdown.
+convert_medium.py — Convert Medium HTML export files to Hugo, Eleventy, or Astro Markdown.
 
 Usage:
-    1. Set SSG to your target generator: "hugo" (default) or "eleventy".
+    1. Set SSG to your target generator: "hugo" (default), "eleventy", or "astro".
     2. Edit the `posts` list below to include only the posts you want to migrate.
        Map each HTML filename (from the Medium export's posts/ directory) to
        the clean slug you want for the canonical URL (title without the hash).
     3. Set INPUT_DIR to the directory containing the extracted HTML files.
     4. Set OUTPUT_DIR (and, for image self-hosting, STATIC_DIR) to where you want
-       output written — point these at hugo-site/ or eleventy-site/ to match SSG.
+       output written — point these at hugo-site/, eleventy-site/, or
+       astro-site/ to match SSG.
     5. Run: python3 convert_medium.py
 
 Images: by default, remote images (Medium's CDN and any other external image
@@ -32,8 +33,8 @@ Personal exports don't include it, so this is a no-op for them.
 Tags: Medium's personal "Download your information" export does not include a
 post's topic tags, but the medium-publication-export skill captures them into
 the export HTML as <a class="p-category"> entries. When present, they are
-written to the Hugo front matter's `tags:` list. Set EXTRACT_TAGS = False to
-omit them.
+written to the front matter's `tags:` list (every SSG). Set EXTRACT_TAGS = False
+to omit them.
 
 Raw HTML in prose: angle brackets that appear as text in a post (e.g. a literal
 <some-tag> mentioned in an article) are escaped to entities so Hugo's Goldmark
@@ -63,21 +64,27 @@ from urllib.parse import urlparse
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-# Target static site generator: "hugo" (default) or "eleventy". This controls
-# only the per-post front matter and how an embedded video is emitted; the rest
-# (HTML→Markdown, image self-hosting, CTA/byline stripping) is identical.
-#   - hugo:     writes `slug:` + `aliases:`; video as a {{< video >}} shortcode.
-#               The *_DIR defaults below target hugo-site/.
-#   - eleventy: writes `permalink:` + `aliases:`; video as an {% video %}
+# Target static site generator: "hugo" (default), "eleventy", or "astro". This
+# controls only the per-post front matter and how an embedded video is emitted;
+# the rest (HTML→Markdown, image self-hosting, CTA/byline stripping) is identical.
+#   - hugo:     writes `slug:` + `date:` + `aliases:`; video as a {{< video >}}
+#               shortcode. The *_DIR defaults below target hugo-site/.
+#   - eleventy: writes `permalink:` + `date:` + `aliases:`; video as an {% video %}
 #               shortcode. Point the *_DIR values at eleventy-site/ instead, e.g.
 #               OUTPUT_DIR = "eleventy-site/content/blog" (the eleventy-base-blog
 #               posts dir) and STATIC_DIR = "eleventy-site/public" (its passthrough
 #               root, served at the site root just like Hugo's static/).
+#   - astro:    writes `slug:` + `pubDate:` + `aliases:`; video as raw <iframe>
+#               HTML (Astro Markdown has no shortcodes). Point the *_DIR values at
+#               astro-site/, e.g. OUTPUT_DIR = "astro-site/src/content/blog" (the
+#               blog content-collection dir) and STATIC_DIR = "astro-site/public"
+#               (its static root, served at the site root just like Hugo's static/).
 SSG = "hugo"
 
 # Canonical URL prefix for posts; must match the site's permalink config (Hugo's
 # [permalinks] / Eleventy's permalink). Used to build the Eleventy `permalink:`
-# field. Hugo derives the path from `slug:` + hugo.toml, so this is unused there.
+# field. Hugo derives the path from `slug:` + hugo.toml, and Astro from `slug:`
+# + its `/posts/[...id]` route, so this is unused on those two.
 PERMALINK_PREFIX = "/posts"
 
 INPUT_DIR = "work/medium-posts"    # Directory containing extracted HTML files
@@ -129,7 +136,7 @@ def _url_extension(url):
 
 
 def localize_image_src(src):
-    """Download a remote image into the Hugo static dir; return a local ref.
+    """Download a remote image into the SSG static/passthrough dir; return a local ref.
 
     Returns a site-root path like /images/<file>. Non-remote srcs (data:,
     relative, or already-local) are returned unchanged. If the download fails,
@@ -552,16 +559,25 @@ def node_to_md(node):
     if tag == "hr":
         return "\n\n---\n\n"
 
-    # Embedded media (iframe inside a figure element), converted to a video
-    # shortcode the site must define:
+    # Embedded media (iframe inside a figure element). Hugo and Eleventy each
+    # have a shortcode mechanism the site defines; plain Astro Markdown has no
+    # shortcodes, so emit the rendered responsive <iframe> HTML inline instead
+    # (Astro Markdown passes raw HTML through):
     #   - hugo:     {{< video src="..." >}}  (layouts/shortcodes/video.html)
     #   - eleventy: {% video "..." %}        (an addShortcode in eleventy.config)
+    #   - astro:    raw <div class="video-embed"><iframe ...></div> (no shortcode)
     if tag == "figure":
         iframe = node.find("iframe")
         if iframe:
             src = iframe.get("src", "")
             if SSG == "eleventy":
                 return f'\n\n{{% video "{src}" %}}\n\n'
+            if SSG == "astro":
+                return (
+                    f'\n\n<div class="video-embed"><iframe src="{src}" '
+                    f'title="Embedded video" loading="lazy" allow="fullscreen" '
+                    f'allowfullscreen></iframe></div>\n\n'
+                )
             return f'\n\n{{{{< video src="{src}" >}}}}\n\n'
         img = node.find("img")
         if img:
@@ -588,7 +604,7 @@ def node_to_md(node):
 
 
 def convert_post(html_filename, clean_slug):
-    """Convert a single Medium HTML export file to Hugo Markdown."""
+    """Convert a single Medium HTML export file to SSG-ready Markdown."""
     input_path = os.path.join(INPUT_DIR, html_filename)
 
     with open(input_path, encoding="utf-8") as f:
@@ -682,10 +698,14 @@ def convert_post(html_filename, clean_slug):
             tags_block = f"tags:\n{items}"
 
     # Canonical URL: Hugo derives /posts/<slug>/ from `slug:` + hugo.toml's
-    # [permalinks]; Eleventy has no such central map, so write an explicit
-    # `permalink:`. The Medium-style slug is preserved as an alias either way
+    # [permalinks]; Astro derives it from `slug:` too (the field overrides a
+    # content-collection entry's id, which the `/posts/[...id]` route maps to
+    # /posts/<slug>/). Eleventy has no such central map, so write an explicit
+    # `permalink:`. The Medium-style slug is preserved as an alias on every SSG
     # (Hugo emits the redirect stub from `aliases:`; on Eleventy a redirects
-    # template consumes the same field — see references/eleventy-setup.md).
+    # template consumes the same field, and on Astro the `redirects` config in
+    # astro.config.mjs does — see references/eleventy-setup.md and
+    # references/astro-setup.md).
     if SSG == "eleventy":
         # Normalize the prefix so a trailing slash (e.g. "/archive/") doesn't
         # produce a double slash in the permalink.
@@ -694,10 +714,14 @@ def convert_post(html_filename, clean_slug):
     else:
         url_line = f'slug: "{clean_slug}"\n'
 
+    # Astro's blog content-collection schema names the publish date `pubDate`
+    # (validated by Zod's z.coerce.date()); Hugo and Eleventy both use `date`.
+    date_field = "pubDate" if SSG == "astro" else "date"
+
     front_matter = (
         f'---\n'
         f'title: "{safe_title}"\n'
-        f'date: {date}\n'
+        f'{date_field}: {date}\n'
         f'{author_line}'
         f'{url_line}'
         f'aliases:\n'

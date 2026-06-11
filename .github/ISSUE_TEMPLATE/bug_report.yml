@@ -42,6 +42,7 @@ body:
         - Not applicable
         - Hugo
         - Eleventy (11ty)
+        - Astro
     validations:
       required: false
   - type: input
@@ -51,7 +52,7 @@ body:
       description: >-
         Many build/styling problems are theme- or starter-specific. If your
         issue relates to scaffolding or building the site, name the Hugo theme
-        or Eleventy starter and link its repo (e.g. "Anatole —
+        or the Eleventy/Astro starter and link its repo (e.g. "Anatole —
         https://github.com/lxndrblz/anatole" or "eleventy-base-blog —
         https://github.com/11ty/eleventy-base-blog"). Leave blank if not
         relevant.
@@ -66,6 +67,6 @@ body:
         Hosting path (AWS / GitHub Pages), infra method (Terraform / AWS CLI),
         personal vs. publication export, OS, and the generator version — Hugo
         version (incl. whether it's the extended build) or Node.js + Eleventy
-        version — anything relevant.
+        or Astro version — anything relevant.
     validations:
       required: false

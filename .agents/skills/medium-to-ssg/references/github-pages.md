@@ -4,7 +4,7 @@ This is the **alternative to AWS** for users who want the lowest-cost, simplest 
 
 Use this path only when the hosting platform recorded in `migration-status.md` is `github-pages`. The content extraction/conversion (Phases 1–2) and site scaffolding (Phase 3) are identical to the AWS path; only hosting (Phase 4), deployment (Phase 5), and DNS cutover (Phases 6–7) differ.
 
-> This file shows the **Hugo** configuration inline. For an **Eleventy** site the only differences are the base-URL/`CNAME` locations (noted in Phase 4 below) and the build steps in the deploy workflow (the **Eleventy variant** block in Phase 5). Everything else — custom-domain setup, DNS records, HTTPS — is identical.
+> This file shows the **Hugo** configuration inline. For an **Eleventy** or **Astro** site the only differences are the base-URL/`CNAME` locations (noted in Phase 4 below) and the build steps in the deploy workflow (the **Eleventy variant** / **Astro variant** blocks in Phase 5). Everything else — custom-domain setup, DNS records, HTTPS — is identical.
 
 > Requirements for the user: a GitHub account and a repository. For **free** Pages the repository must be **public**. Private repositories require a paid plan (GitHub Pro, Team, or Enterprise). Confirm this with the user before proceeding.
 
@@ -12,8 +12,8 @@ Use this path only when the hosting platform recorded in `migration-status.md` i
 
 ## What carries over from the AWS path
 
-- **Old Medium URLs are still preserved.** On Hugo, the `aliases` field generates static `<meta refresh>` redirect pages that work on GitHub Pages exactly as they do on S3. On Eleventy, the redirects collection + template (`references/eleventy-setup.md`) generates the same static stubs — equally host-agnostic. No change needed for either.
-- **`404.html`** is served automatically by GitHub Pages for missing paths (both Hugo and the `eleventy-base-blog` starter emit one).
+- **Old Medium URLs are still preserved.** On Hugo, the `aliases` field generates static `<meta refresh>` redirect pages that work on GitHub Pages exactly as they do on S3. On Eleventy, the redirects collection + template (`references/eleventy-setup.md`) generates the same static stubs; on Astro, the catch-all redirect route (`references/astro-setup.md`) does — both equally host-agnostic. No change needed for any of them.
+- **`404.html`** is served automatically by GitHub Pages for missing paths (Hugo, the `eleventy-base-blog` starter, and the Astro `blog` starter each emit one).
 - **Permalink structure** (`/posts/<slug>/`) and the converted post files are unchanged.
 
 ## What is different from AWS (the control tradeoffs)
@@ -47,6 +47,8 @@ baseURL = "https://example.com/"
 ```
 
 > **Eleventy:** there is no `hugo.toml`. Set the production URL in `_data/metadata.js` (`url: "https://example.com/"`) instead; the feed and absolute links read from it.
+>
+> **Astro:** set the production URL via `site` in `astro.config.mjs` (`site: 'https://example.com'`); the sitemap, feed, and canonical links read from it.
 
 ### 3. Add the `CNAME` file
 
@@ -54,6 +56,7 @@ GitHub Pages reads a `CNAME` file at the site root to bind the custom domain. Pu
 
 - **Hugo:** `hugo-site/static/CNAME` (copied into `public/`).
 - **Eleventy:** `eleventy-site/public/CNAME` (the base blog passes `public/` through to `_site/`).
+- **Astro:** `astro-site/public/CNAME` (Astro copies `public/` verbatim into `dist/`).
 
 Contents (apex domain only, no scheme, no `www`):
 
@@ -69,7 +72,7 @@ This applies to **Hugo** only. If the chosen theme is added as a git submodule, 
 
 If the theme is instead installed as a **Hugo Module** (a `[module]` import with `go.mod`/`go.sum` and no `themes/` submodule), commit `go.mod` and `go.sum`, and add an `actions/setup-go` step to the deploy workflow before the build so Hugo can fetch the module (see the module note in `references/cicd.md`).
 
-> **Eleventy** has no theme submodule — the starter is committed directly into `eleventy-site/`, and the deploy workflow installs npm dependencies instead (see the Eleventy variant in Phase 5).
+> **Eleventy** has no theme submodule — the starter is committed directly into `eleventy-site/`, and the deploy workflow installs npm dependencies instead (see the Eleventy variant in Phase 5). The same is true for **Astro** (`astro-site/`, npm install — see the Astro variant in Phase 5).
 
 ---
 
@@ -140,7 +143,7 @@ updates:
       interval: weekly
 ```
 
-> **Eleventy:** add a second `npm` entry so the starter's JavaScript dependencies stay patched too (the `npm` ecosystem applies on every hosting path — see "Eleventy: also track npm dependencies" in `references/cicd.md`):
+> **Eleventy or Astro:** add a second `npm` entry so the starter's JavaScript dependencies stay patched too (the `npm` ecosystem applies on every hosting path — see "Eleventy or Astro: also track npm dependencies" in `references/cicd.md`):
 >
 > ```yaml
 >   - package-ecosystem: npm
@@ -179,6 +182,35 @@ For an **Eleventy** site, keep the `configure-pages` / `upload-pages-artifact` /
 ```
 
 The `deploy` job is unchanged. Unlike the Hugo build, there is no `--baseURL` flag — Eleventy reads the production URL from `_data/metadata.js` (set in Phase 4), so confirm that value is the custom domain. The `run: npx @11ty/eleventy` step matches the `eleventy-base-blog` build; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
+
+### Astro variant
+
+For an **Astro** site, keep the `configure-pages` / `upload-pages-artifact` / `deploy-pages` structure above and swap only the build steps (same shape as the Eleventy variant). Build with `npm run build` and point the artifact at `dist/` instead of `./public`:
+
+```yaml
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@SHA_HERE  # vX.Y.Z
+
+      - uses: actions/setup-node@SHA_HERE  # vX.Y.Z
+        with:
+          node-version-file: ".nvmrc"   # matches the version pinned in Step 2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: actions/configure-pages@SHA_HERE  # vX.Y.Z
+
+      - name: Build with Astro
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@SHA_HERE  # vX.Y.Z
+        with:
+          path: ./dist
+```
+
+The `deploy` job is unchanged. Like Eleventy there is no `--baseURL` flag — Astro reads the production URL from `site` in `astro.config.mjs` (set in Phase 4), so confirm that value is the custom domain. Pin `.nvmrc` to the Node version the starter's `engines` field requires (read it from the starter rather than hard-coding a number; see Step 2 in `references/astro-setup.md`). If the chosen starter wraps the build in extra steps, `npm run build` still runs them — see "Adapting to a different starter" in `references/astro-setup.md`.
 
 ### Enable Pages in repo settings
 
