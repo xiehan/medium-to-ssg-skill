@@ -178,7 +178,7 @@ For an **Eleventy** site, keep the `configure-pages` / `upload-pages-artifact` /
           path: ./_site
 ```
 
-The `deploy` job is unchanged. Unlike the Hugo build, there is no `--baseURL` flag — Eleventy reads the production URL from `_data/metadata.js` (set in Phase 4), so confirm that value is the custom domain.
+The `deploy` job is unchanged. Unlike the Hugo build, there is no `--baseURL` flag — Eleventy reads the production URL from `_data/metadata.js` (set in Phase 4), so confirm that value is the custom domain. The `run: npx @11ty/eleventy` step matches the `eleventy-base-blog` build; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
 
 ### Enable Pages in repo settings
 

@@ -150,7 +150,7 @@ The `deploy.yml` above is written for the **Hugo** path. For an **Eleventy** sit
       # ... CloudFront invalidation step is unchanged ...
 ```
 
-Use `node-version-file: ".nvmrc"` so CI builds with the same Node the user builds with locally (a local/CI Node mismatch is the most common Eleventy CI failure). Do not add the `peaceiris/actions-hugo` step on this path.
+Use `node-version-file: ".nvmrc"` so CI builds with the same Node the user builds with locally (a local/CI Node mismatch is the most common Eleventy CI failure). Do not add the `peaceiris/actions-hugo` step on this path. The `run: npx @11ty/eleventy` build matches the `eleventy-base-blog` starter; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
 
 ---
 

@@ -18,7 +18,23 @@ rm -f eleventy-site/.github/workflows/gh-pages.yml.sample
 
 The base blog ships a sample GitHub Pages workflow at `.github/workflows/gh-pages.yml.sample`. Delete it: this skill generates its own deployment workflow in Phase 5 (Content Deployment) — see `references/github-pages.md` or `references/cicd.md` — and leaving the starter's sample in place only invites confusion about which workflow is authoritative.
 
-If the user supplied a different starter, clone that instead and read its README before continuing — the directory names, config filename, and passthrough setup below may all differ. Remove any equivalent sample deploy workflow it ships for the same reason.
+### Remove the starter's own repository cruft
+
+Because the starter is **cloned** (not installed as a dependency), its repo also carries files that belong to *its* project, not the user's blog. Left in place these become confusing garbage in the user's new repo — upstream CI that fails or runs unwanted jobs, a funding button pointing at the starter's author, a contributing guide for a project the user isn't running, and config for hosts this migration doesn't use. After cloning, audit the starter for these and remove the ones that don't apply. Common offenders (varies by starter — `ls -a` and check `.github/`):
+
+- `.github/FUNDING.yml` — sponsor links for the starter's author.
+- `.github/workflows/*` and other CI configs (`.travis.yml`, `azure-pipelines.yml`, CodeQL/build/test workflows) — the starter's own CI. This skill generates the only workflow the blog needs in Phase 5; delete the rest so they don't run (or fail) in the user's repo.
+- `.github/CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue/PR templates, `CHANGELOG.md` — community docs for the starter project.
+- `netlify.toml`, `vercel.json`, `.github/dependabot.yml` shipped by the starter — host/automation config for platforms this skill isn't using (the skill writes its own `dependabot.yml` in Phase 5).
+
+Two judgment calls rather than automatic deletions:
+
+- **`LICENSE`** — this is the *starter's* license. Many permissive licenses (MIT, etc.) require keeping the copyright/attribution if you reuse the code, so don't blindly delete it. Either keep it as-is, or replace it with the user's own license while preserving any attribution the starter's license requires. Confirm with the user.
+- **`README.md`** — the starter's README documents the starter, not the user's blog. Replace it with a short README for the user's site (or remove it) rather than shipping the starter's.
+
+When in doubt about a file, ask the user before deleting — but the goal is that the finished repo contains only the user's site plus the files this skill creates, with no leftover scaffolding from the upstream project.
+
+If the user supplied a different starter, clone that instead and read its README before continuing — the directory names, config filename, and passthrough setup below may all differ. Remove any equivalent sample deploy workflow it ships, and run the same cruft audit above (a heavier starter often carries *more* of these files, not fewer).
 
 ## Step 2 — Pin Node and install dependencies
 
@@ -221,6 +237,20 @@ If Node/Eleventy is not available in the current environment, document these ste
 ## Step 11 — Confirm and update status
 
 Confirm the Eleventy site structure with the user. Mark the Site Setup phase complete in `migration-status.md` and list all created files. Record the build command (`npx @11ty/eleventy`) and output directory (`_site/`) in `migration-status.md` — the hosting and deployment phases read those two values (the "SSG seam") instead of Hugo's `hugo --minify` / `public/`.
+
+## Adapting to a different starter
+
+The steps above assume `eleventy-base-blog`'s conventions. The converter's **output is starter-agnostic** — the front matter, `{% video %}` shortcode, and `/images/...` references it produces are correct regardless of starter — but a different starter wires up posts, images, and tags differently, so the *integration* needs adjusting. If the user picked another starter, re-read its README and `eleventy.config.js` (or `.eleventy.js`) and watch for these differences, all of which were hit when testing real-world starters:
+
+- **A required `description` (or excerpt/summary) field.** Many starters' post-card or listing templates assume each post has a `description` and will **crash the build** if it is missing (a markdown filter receiving `undefined` instead of a string is a common symptom). The converter does **not** emit a `description`. If the chosen starter requires one, add a short `description:` to each converted post (e.g. derived from the title or first paragraph) before building, or relax the template.
+- **No root passthrough folder.** Step 5 assumes the starter passthrough-copies a folder to the site root (the base blog's `public/`). Some starters pass through only same-named folders (`img/`, `css/`, …) and have no catch-all root folder. In that case add an explicit passthrough for the image directory so `/images/...` resolves, e.g. `eleventyConfig.addPassthroughCopy({ "src/static/images": "/images" });` (adjust to where `STATIC_DIR` writes), and point `STATIC_DIR` at that source folder.
+- **Automatic image-transform plugins collide.** Performance-focused starters often ship a plugin that rewrites every `<img>` at build time — `@11ty/eleventy-img`'s `eleventyImageTransformPlugin`, a `localImages`/remote-image downloader, or an `img-dim` dimension-reader. These intercept the converter's already-self-hosted `/images/...` tags (and may try to re-fetch the original remote Medium images), which breaks or slows the build. Scope these off — or restrict their selector — so they don't touch the migrated posts' images, which are already downloaded and rewritten.
+- **Layout assignment varies.** Step 4 relies on the starter applying the post layout through a **directory data file** (the base blog's `content/blog/blog.11tydata.js`), so converted posts need no `layout:`. Other starters set the layout per-post in each demo file and apply **no default**, in which case converted posts render with no template. If the starter has no directory-data default layout, add one — either a directory data file for `OUTPUT_DIR` (`tags: ["posts"]`, `layout: "<the starter's post layout>"`) or a `layout:` on each post.
+- **The Step 7 tag-exclusion note may not apply.** That note guards against the base blog generating a `/tags/redirects/` page because it builds a tag page for *every* collection key. Starters that instead derive tag pages from the **post tags themselves** (a `tagList`/`getTagList`-style collection) won't leak a `redirects` tag, so the `filters.js` / `tag-pages.njk` edits are unnecessary there. Conversely, if the starter already uses `redirects` as a content tag or collection name, rename this skill's collection (e.g. `mediumRedirects`) to avoid a clash. Check how the starter builds its tag pages before applying or skipping Step 7's exclusion.
+- **An end-of-life Node version in `.nvmrc`.** Step 2 says to use the version in the starter's `.nvmrc`, but an older popular starter may pin a Node version that is now end-of-life (e.g. Node 14). Modern Eleventy needs Node 18+ (v3 needs Node 18+, and the base blog needs 22+). Prefer a current LTS over a stale `.nvmrc` pin, and set the same version in CI's `actions/setup-node`.
+- **The build command may not be a bare `npx @11ty/eleventy`.** The base blog's `npm run build` is exactly `npx @11ty/eleventy`, which is why the deploy workflows in `references/github-pages.md` and `references/cicd.md` use that command. Other starters wrap the build in an npm script that does required pre/post steps — e.g. bundling JS with Rollup, or setting `ELEVENTY_ENV=production` to toggle minification and drafts — so a bare `npx @11ty/eleventy` would skip them and ship a broken or non-production build. Read the starter's `package.json` `scripts.build`; if it is more than `eleventy`, use the starter's own build command (typically `npm run build`) in both local testing (Step 10) and the CI workflow's build step.
+
+None of these block a migration — every tested starter completed all four deliverables (posts at `/posts/<slug>/`, redirect stubs, video embeds, self-hosted images) once integrated. They are one-time integration adjustments, not converter changes.
 
 ## Eleventy ⇄ Hugo quick reference
 
