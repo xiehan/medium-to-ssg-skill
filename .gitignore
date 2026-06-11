@@ -35,6 +35,16 @@ eleventy-site/
 # done from a different working directory.
 _site/
 
+# --- medium-to-ssg: generated Astro site -----------------------------------
+# A test run scaffolds an Astro project (from the official blog starter) under
+# astro-site/ in the working directory; like hugo-site/ it's entirely
+# generated output.
+astro-site/
+# Astro build output and cache, in case a test run is done from a different
+# working directory.
+dist/
+.astro/
+
 # --- medium-to-ssg: generated infrastructure (AWS paths) -------------------
 # Terraform state is sensitive and machine-local; never commit it.
 *.tfstate

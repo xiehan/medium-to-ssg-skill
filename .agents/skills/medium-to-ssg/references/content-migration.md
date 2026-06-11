@@ -36,11 +36,11 @@ To get the canonical Medium URL for each post, look for:
 <a class="p-canonical" href="https://...">
 ```
 
-Note any posts that contain `<iframe>` elements (these need a video shortcode). You do not need to track `<img>` tags by hand — the conversion script in Part 2 downloads remote images and rewrites their references automatically.
+Note any posts that contain `<iframe>` elements (the converter turns these into a video embed — a `video` shortcode on Hugo and Eleventy, raw responsive `<iframe>` HTML on Astro). You do not need to track `<img>` tags by hand — the conversion script in Part 2 downloads remote images and rewrites their references automatically.
 
 ### Step 4 — Embedded images (handled automatically)
 
-Images hosted on Medium's CDN (`miro.medium.com`, `cdn-images-*.medium.com`) or any other external URL are self-hosted automatically by `scripts/convert_medium.py` in Part 2: each remote image is downloaded into the SSG's static/passthrough images folder (`hugo-site/static/images/` for Hugo, `eleventy-site/public/images/` for Eleventy — set by the script's `STATIC_DIR`) and its Markdown reference is rewritten to a local `/images/<file>` path, so the migrated site keeps working even after Medium's CDN stops serving them. No manual downloading or reference-fixing is required.
+Images hosted on Medium's CDN (`miro.medium.com`, `cdn-images-*.medium.com`) or any other external URL are self-hosted automatically by `scripts/convert_medium.py` in Part 2: each remote image is downloaded into the SSG's static/passthrough images folder (`hugo-site/static/images/` for Hugo, `eleventy-site/public/images/` for Eleventy, `astro-site/public/images/` for Astro — set by the script's `STATIC_DIR`) and its Markdown reference is rewritten to a local `/images/<file>` path, so the migrated site keeps working even after Medium's CDN stops serving them. No manual downloading or reference-fixing is required.
 
 The converter prints an image summary when it finishes (e.g. `Images: 12 downloaded, 0 reused, 0 failed`). If a download fails (network issue, deleted asset), that image keeps its original remote URL so nothing is lost, the failure is counted, and you can re-run the script to retry. To skip self-hosting entirely and keep all remote URLs, set `DOWNLOAD_IMAGES = False` at the top of the script.
 
@@ -52,15 +52,16 @@ The converter prints an image summary when it finishes (e.g. `Images: 12 downloa
 
 Use `scripts/convert_medium.py`. Before running it:
 
-- Set **`SSG`** at the top of the script to match the generator chosen in `migration-status.md`: `"hugo"` (default) or `"eleventy"`. This controls only the per-post front matter and the video-embed syntax; the rest of the conversion is identical.
+- Set **`SSG`** at the top of the script to match the generator chosen in `migration-status.md`: `"hugo"` (default), `"eleventy"`, or `"astro"`. This controls only the per-post front matter and the video-embed syntax; the rest of the conversion is identical.
 - Edit the **`posts`** list to include only the confirmed posts from your inventory, mapping each HTML filename to its intended clean slug (title without the Medium hash suffix).
 - For **Eleventy**, also point `OUTPUT_DIR` at the starter's posts directory (`eleventy-site/content/blog`) and `STATIC_DIR` at its passthrough root (`eleventy-site/public`); the defaults target Hugo's `hugo-site/`. See `references/eleventy-setup.md`.
+- For **Astro**, point `OUTPUT_DIR` at the content-collection directory (`astro-site/src/content/blog`) and `STATIC_DIR` at the public root (`astro-site/public`). See `references/astro-setup.md`.
 
 ```bash
 python3 scripts/convert_medium.py
 ```
 
-Output files are written to `OUTPUT_DIR` (default `hugo-site/content/posts/` for Hugo; `eleventy-site/content/blog/` for Eleventy).
+Output files are written to `OUTPUT_DIR` (default `hugo-site/content/posts/` for Hugo; `eleventy-site/content/blog/` for Eleventy; `astro-site/src/content/blog/` for Astro).
 
 ### Step 2 — Understand the front matter format
 
@@ -69,9 +70,9 @@ The script generates front matter in this format (the canonical-URL field depend
 ```yaml
 ---
 title: "Post Title Here"
-date: 2024-01-15
+date: 2024-01-15                  # Astro writes `pubDate:` instead of `date:`
 author: "Author Name"
-slug: "post-title-here"          # Hugo: clean URL path under /posts/
+slug: "post-title-here"          # Hugo & Astro: clean URL path under /posts/
 # permalink: "/posts/post-title-here/"   # Eleventy writes this line instead of slug
 aliases:
   - /post-title-here-a1b2c3d4e5f6
@@ -81,7 +82,7 @@ tags:
 ---
 ```
 
-For **Hugo**, `slug` is the clean URL path under `/posts/`, and the `aliases` value (the full Medium-style slug, title + hash) is one Hugo creates a redirect page for automatically. For **Eleventy** the script writes an explicit `permalink: "/posts/<slug>/"` instead of `slug:` (its prefix comes from the script's `PERMALINK_PREFIX`), and the same `aliases` field is consumed by the redirects template described in `references/eleventy-setup.md` to produce the equivalent stub pages. Either way the canonical URL is `/posts/<slug>/` and the old Medium URL keeps resolving.
+For **Hugo**, `slug` is the clean URL path under `/posts/`, and the `aliases` value (the full Medium-style slug, title + hash) is one Hugo creates a redirect page for automatically. For **Eleventy** the script writes an explicit `permalink: "/posts/<slug>/"` instead of `slug:` (its prefix comes from the script's `PERMALINK_PREFIX`), and the same `aliases` field is consumed by the redirects template described in `references/eleventy-setup.md` to produce the equivalent stub pages. For **Astro** the script writes `slug:` (like Hugo) plus `pubDate:` instead of `date:` (matching the content-collection schema), and the same `aliases` field is consumed by the catch-all redirect route described in `references/astro-setup.md`. Either way the canonical URL is `/posts/<slug>/` and the old Medium URL keeps resolving.
 
 `author:` and `tags:` are optional and only appear when the source provides them. A personal Medium "Download your information" export carries no tags, so `tags:` is omitted for those posts; content captured with the `medium-publication-export` skill recovers each post's topic tags and the converter writes them here. To omit tags even when they're available, set `EXTRACT_TAGS = False` at the top of `convert_medium.py`.
 
@@ -98,7 +99,7 @@ Open each output `.md` file and verify:
 
 ### Step 4 — Handle embedded media
 
-If a post contains an `<iframe>` (e.g. a YouTube or Vimeo embed), the script converts it to a video shortcode whose syntax depends on `SSG`.
+If a post contains an `<iframe>` (e.g. a YouTube or Vimeo embed), the script converts it to a video embed whose form depends on `SSG`.
 
 **Hugo** emits:
 
@@ -121,6 +122,8 @@ which requires a custom Hugo shortcode at `hugo-site/layouts/shortcodes/video.ht
 ```
 
 **Eleventy** emits `{% video "IFRAME_SRC_URL" %}` instead, which requires an `addShortcode("video", …)` in `eleventy.config.js` — see Step 6 of `references/eleventy-setup.md` for the definition.
+
+**Astro** has no shortcode mechanism in plain Markdown, so the script emits the rendered responsive `<iframe>` HTML inline (`<div class="video-embed"><iframe src="IFRAME_SRC_URL" …></iframe></div>`). Astro passes raw HTML through, so nothing extra is required — see Step 6 of `references/astro-setup.md`.
 
 ### Step 5 — Handle internal cross-links
 

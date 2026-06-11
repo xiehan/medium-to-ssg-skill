@@ -152,6 +152,40 @@ The `deploy.yml` above is written for the **Hugo** path. For an **Eleventy** sit
 
 Use `node-version-file: ".nvmrc"` so CI builds with the same Node the user builds with locally (a local/CI Node mismatch is the most common Eleventy CI failure). Do not add the `peaceiris/actions-hugo` step on this path. The `run: npx @11ty/eleventy` build matches the `eleventy-base-blog` starter; if the chosen starter's `package.json` `scripts.build` does more than call `eleventy` (e.g. bundles JS or sets `ELEVENTY_ENV=production`), use that command (typically `npm run build`) here instead — see "Adapting to a different starter" in `references/eleventy-setup.md`.
 
+### Astro variant
+
+Astro is the same shape as the Eleventy variant — a Node toolchain replaces the Hugo steps — with two differences: the build command is `npm run build` and the output directory is `dist/` (not `_site/`). Sync `dist/` instead of `public/`:
+
+```yaml
+      - uses: actions/checkout@SHA_HERE  # vX.Y.Z
+        # No `submodules: recursive` needed — the Astro starter is committed,
+        # not a theme submodule.
+
+      - uses: actions/setup-node@SHA_HERE  # vX.Y.Z
+        with:
+          node-version-file: ".nvmrc"   # matches the version pinned in Step 2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      # ... configure-aws-credentials step is unchanged ...
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync dist/ s3://${{ vars.S3_BUCKET }}/ \
+            --delete \
+            --cache-control "public, max-age=3600"
+
+      # ... CloudFront invalidation step is unchanged ...
+```
+
+Pin `.nvmrc` to the Node version the starter's `package.json` `engines` requires (Astro's floor is higher than this skill's other paths and rises over time — read it from the starter, don't hard-code it; see Step 2 in `references/astro-setup.md`). `npm run build` runs the starter's `astro build`; if the chosen starter wraps the build in extra steps (e.g. `astro check` first), that same `npm run build` still runs them — see "Adapting to a different starter" in `references/astro-setup.md`.
+
+**If the theme's lockfile names pnpm or bun instead of npm**, swap the toolchain to match (the lockfile names the manager — see "Install with the package manager the theme's lockfile names" in `references/astro-setup.md`). For **pnpm**, add `pnpm/action-setup@SHA` *before* `actions/setup-node`, set the node step's `cache: pnpm`, and use `pnpm install --frozen-lockfile` / `pnpm run build`. For **bun**, add `oven-sh/setup-bun@SHA` and use `bun install --frozen-lockfile` / `bun run build`, keeping `actions/setup-node` so Astro's `engines` floor is satisfied (a bun-only theme like erudite ships no `.nvmrc`, so pin a concrete `node-version:` rather than `node-version-file`). Pin any added action to a commit SHA like the rest.
+
 ---
 
 ## terraform.yml
@@ -271,9 +305,9 @@ updates:
 
 This single entry covers all workflows under `.github/workflows/`. Dependabot will open PRs to update pinned SHAs when new action versions are released, keeping the version comments in sync automatically.
 
-### Eleventy: also track npm dependencies
+### Eleventy or Astro: also track npm dependencies
 
-When the SSG is **Eleventy**, the site is an npm project (`package.json` at the repo root, alongside `.github/`), so add a second `npm` ecosystem entry to keep Eleventy and its plugins patched. Do this **regardless of hosting platform or deployment method** — it is about the project's JavaScript dependencies, not CI:
+When the SSG is **Eleventy** or **Astro**, the site is an npm project (`package.json` at the repo root, alongside `.github/`), so add a second `npm` ecosystem entry to keep the generator and its plugins/integrations patched. (Dependabot's `npm` ecosystem also covers pnpm and yarn projects; for a bun-only theme it still tracks `package.json`, though Dependabot's bun-lockfile support is limited.) Do this **regardless of hosting platform or deployment method** — it is about the project's JavaScript dependencies, not CI:
 
 ```yaml
 version: 2
@@ -288,7 +322,7 @@ updates:
       interval: weekly
 ```
 
-On the **AWS CLI + manual deploy** Eleventy path there are no workflows, so there is no `github-actions` entry and no `.github/workflows/` folder — but still create `.github/dependabot.yml` with **just the `npm` entry** so dependencies stay current. On the Hugo path, omit the `npm` entry entirely (Hugo is a single binary with no `package.json` to track, unless a theme adds a PostCSS toolchain — see `references/hugo-setup.md`).
+On the **AWS CLI + manual deploy** Eleventy or Astro path there are no workflows, so there is no `github-actions` entry and no `.github/workflows/` folder — but still create `.github/dependabot.yml` with **just the `npm` entry** so dependencies stay current. On the Hugo path, omit the `npm` entry entirely (Hugo is a single binary with no `package.json` to track, unless a theme adds a PostCSS toolchain — see `references/hugo-setup.md`).
 
 ---
 

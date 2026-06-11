@@ -1,6 +1,6 @@
 # Eleventy Site Setup Reference
 
-This is the Eleventy counterpart to `hugo-setup.md`. Read it instead of (not in addition to) `hugo-setup.md` when the chosen SSG is **Eleventy**. Hugo remains the default; only follow this file when the user explicitly chose Eleventy.
+This is the Eleventy counterpart to `hugo-setup.md`. Read it instead of (not in addition to) `hugo-setup.md` or `astro-setup.md` when the chosen SSG is **Eleventy**. Hugo remains the default; only follow this file when the user explicitly chose Eleventy.
 
 Eleventy (11ty) is a Node.js static site generator. Unlike Hugo there is **no central theme gallery** and no single binary — a site is an npm project, and the closest equivalent to a "theme" is a **starter repository** you clone and own. This skill standardizes on the official [`eleventy-base-blog`](https://github.com/11ty/eleventy-base-blog) starter as the default; the user may pick a different starter, but the steps below assume the base blog's conventions and you must re-read the chosen starter's README if it differs.
 

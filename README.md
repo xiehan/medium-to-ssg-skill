@@ -6,8 +6,9 @@ You choose your **static site generator (SSG)**:
 
 - **[Hugo](https://gohugo.io) (default)** — a single fast Go binary with a huge theme gallery and built-in URL-alias support. No Node toolchain. Best for most users.
 - **[Eleventy (11ty)](https://www.11ty.dev)** — a Node.js generator scaffolded from the official `eleventy-base-blog` starter. Best if you prefer a JavaScript/Node ecosystem and hand-owned templates over a packaged theme.
+- **[Astro](https://astro.build)** — a Node.js generator scaffolded from the official free `blog` starter. Best if you want a modern, component-based JavaScript toolchain with hand-owned templates.
 
-Both produce the same posts, the same preserved Medium URLs, and work with either hosting option below. **If you're unsure, pick Hugo** — it's the default and my personal favorite. See [Choosing your static site generator](#choosing-your-static-site-generator).
+All produce the same posts, the same preserved Medium URLs, and work with either hosting option below. **If you're unsure, pick Hugo** — it's the default and my personal favorite. See [Choosing your static site generator](#choosing-your-static-site-generator).
 
 You choose **where to host** the site:
 
@@ -66,14 +67,14 @@ This means tags are a reason to choose `medium-publication-export` **even for a 
 
 After completing the migration, you'll have:
 
-- A **Hugo or Eleventy site** with all your Medium posts converted to Markdown.
-- **Preserved old Medium URLs** — visitors clicking old links still land on the right post (via Hugo `aliases`, or an equivalent redirects template on Eleventy, that generate redirect pages).
+- A **Hugo, Eleventy, or Astro site** with all your Medium posts converted to Markdown.
+- **Preserved old Medium URLs** — visitors clicking old links still land on the right post (via Hugo `aliases`, or an equivalent redirects template on Eleventy / redirect route on Astro, that generate redirect pages).
 - **Hosting on your terms** — either **AWS** (a private S3 bucket served through CloudFront with HTTPS via ACM) or **GitHub Pages** (free, GitHub-managed hosting with automatic HTTPS).
 - **Infrastructure created your way** (AWS only) — either reproducible **Terraform** code, or a set of plain **AWS CLI** shell scripts if you'd rather not use Terraform.
 - **Content deployment** — **GitHub Actions** that rebuild and deploy on every push, or (on the AWS CLI path) a simple **`deploy.sh` script** you run by hand when you update the blog.
 - A custom domain pointed at your new site, with your existing email/DNS records preserved.
 
-All generated files land in a `hugo-site/` (Hugo) or `eleventy-site/` (Eleventy) folder in your working directory.
+All generated files land in a `hugo-site/` (Hugo), `eleventy-site/` (Eleventy), or `astro-site/` (Astro) folder in your working directory.
 
 ---
 
@@ -85,18 +86,18 @@ You'll need the following ready. The agent will ask you for them, so it helps to
 |---|---|
 | **Your Medium export** | In Medium: **Settings → Security and apps → Download your information**. You'll get a ZIP. Extract it somewhere in your project. **Multi-author publication?** That export only covers your own account, so it can't export a whole team/company publication. Use the companion [`medium-publication-export`](.agents/skills/medium-publication-export/SKILL.md) skill first — it produces a ZIP in the same format. See [Two scenarios: personal blog vs. publication](#two-scenarios-personal-blog-vs-publication). |
 | **A domain name** | The bare domain, e.g. `example.com` (not `www.example.com`). |
-| **A theme (Hugo) or starter (Eleventy)** | **Hugo:** browse <https://themes.gohugo.io/tags/blog/>, pick one, and copy **both** its name and its **GitHub repository URL** (the skill won't assume a theme for you). **Eleventy:** no choice needed — the skill defaults to the official [`eleventy-base-blog`](https://github.com/11ty/eleventy-base-blog) starter (name a different starter repo if you prefer). |
+| **A theme (Hugo) or starter (Eleventy/Astro)** | **Hugo:** browse <https://themes.gohugo.io/tags/blog/>, pick one, and copy **both** its name and its **GitHub repository URL** (the skill won't assume a theme for you). **Eleventy:** no choice needed — the skill defaults to the official [`eleventy-base-blog`](https://github.com/11ty/eleventy-base-blog) starter (name a different starter repo if you prefer). **Astro:** no choice needed — the skill defaults to the official free [`blog`](https://github.com/withastro/astro/tree/latest/examples/blog) starter (name a different starter if you prefer, but note Astro's showcase is mostly paid themes). |
 | **A GitHub repository** | In `username/repo` format, e.g. `jsmith/example.com`. This is where your site and CI/CD live. For free GitHub Pages it must be **public**. |
 | **An AWS account** *(AWS hosting only)* | With permission to create S3, CloudFront, ACM, Route 53, and IAM resources. Default region is `us-east-1`. **Not needed if you host on GitHub Pages.** |
 | **Access to your DNS** | Know where your domain's DNS is currently managed (Route 53, Namecheap, Cloudflare, your registrar, etc.). You'll point it at your new host at the end. |
-| **Static site generator** *(optional choice)* | Which SSG builds your site: **Hugo** (default) or **Eleventy**. See [Choosing your static site generator](#choosing-your-static-site-generator). |
+| **Static site generator** *(optional choice)* | Which SSG builds your site: **Hugo** (default), **Eleventy**, or **Astro**. See [Choosing your static site generator](#choosing-your-static-site-generator). |
 | **Hosting platform** *(optional choice)* | Where the site is hosted: **AWS** (default) or **GitHub Pages**. See [Choosing where to host your site](#choosing-where-to-host-your-site). |
 | **Infrastructure method** *(AWS only, optional choice)* | How AWS resources get created: **Terraform** (default) or **AWS CLI** (no Terraform needed). See [Choosing how AWS infrastructure is created](#choosing-how-aws-infrastructure-is-created). |
 
 **Tools to have installed locally** (the agent can help you install/verify these):
 
 - [Hugo](https://gohugo.io/installation/) (extended version recommended) — **Hugo path only** (the default SSG)
-- [Node.js](https://nodejs.org/) — **Eleventy path only**; install the version pinned by the `eleventy-base-blog` starter's `.nvmrc` (currently Node 22+)
+- [Node.js](https://nodejs.org/) — **Eleventy or Astro path only**; install the version the starter pins (read its `.nvmrc` and/or the `engines` field in `package.json`). Astro requires a recent Node release and skips odd-numbered majors, so its floor is usually higher than Eleventy's — the agent reads the starter's own requirement rather than assuming a fixed number.
 - [Git](https://git-scm.com/) — required for all paths
 - [Python 3](https://www.python.org/) with `beautifulsoup4` (`pip install beautifulsoup4`) — used by the content conversion script
 - [AWS CLI](https://aws.amazon.com/cli/), logged in (`aws configure`) — **AWS hosting only** (required for both AWS infrastructure methods). Not needed for GitHub Pages.
@@ -148,8 +149,8 @@ These are the choices that shape your migration. The agent records each one in a
 |---|---|---|---|---|
 | **Medium export ZIP** | Yes | — | `work/medium-export/` | Extract it first. Note: the export includes posts from **every** publication you ever wrote for, not just your own blog. |
 | **Domain name** | Yes | — | `example.com` | Use the bare/apex domain. The skill sets up `www → apex` redirects automatically. |
-| **Static site generator** | No | `hugo` | `eleventy` | Which SSG builds the site. Defaults to Hugo. Choose Eleventy for a Node.js/JavaScript workflow. Sets the build command and output directory used by later phases. See [Choosing your static site generator](#choosing-your-static-site-generator). |
-| **Theme (Hugo) or starter (Eleventy)** | Hugo: yes | Hugo: *none — you must choose*; Eleventy: `eleventy-base-blog` | `Anatole` + GitHub URL | **Hugo:** pick from <https://themes.gohugo.io/tags/blog/> and provide **both** the name and the repo URL. **Eleventy:** defaults to the official `eleventy-base-blog` starter; name a different starter repo to override. |
+| **Static site generator** | No | `hugo` | `eleventy`, `astro` | Which SSG builds the site. Defaults to Hugo. Choose Eleventy or Astro for a Node.js/JavaScript workflow. Sets the build command and output directory used by later phases. See [Choosing your static site generator](#choosing-your-static-site-generator). |
+| **Theme (Hugo) or starter (Eleventy/Astro)** | Hugo: yes | Hugo: *none — you must choose*; Eleventy: `eleventy-base-blog`; Astro: `blog` example | `Anatole` + GitHub URL | **Hugo:** pick from <https://themes.gohugo.io/tags/blog/> and provide **both** the name and the repo URL. **Eleventy:** defaults to the official `eleventy-base-blog` starter. **Astro:** defaults to the official `blog` example; name a different starter to override either. |
 | **Permalink format** | No | `/posts/:slug/` | `/blog/:slug/`, `/archive/:slug/`, `/:slug/` | The URL path for your posts. Defaults to `/posts/:slug/`. Tell the agent up front if you want a different prefix (it keeps the content folder and redirects in sync). |
 | **GitHub repository** | Yes | — | `jsmith/example.com` | `username/repo` format. Hosts the site and CI/CD. Must be **public** for free GitHub Pages. |
 | **Hosting platform** | No | `aws` | `github-pages` | Where the site is hosted. Defaults to AWS. Choose GitHub Pages for the cheapest, simplest path. See below. |
@@ -159,7 +160,7 @@ These are the choices that shape your migration. The agent records each one in a
 
 ### Things the skill will *not* assume (by design)
 
-- **It won't pick a Hugo theme for you.** On the Hugo path you must choose one and give the GitHub URL. (On the Eleventy path it defaults to the `eleventy-base-blog` starter, so there's nothing to pick.)
+- **It won't pick a Hugo theme for you.** On the Hugo path you must choose one and give the GitHub URL. (On the Eleventy and Astro paths it defaults to their official starters, so there's nothing to pick.)
 - **It won't guess your DNS/email records.** Before any cutover it asks you to share your current DNS records so important ones (MX, TXT, domain verification, third-party services) are preserved.
 - **It won't run the content conversion until you confirm the post list.** Because Medium exports contain all your contributions, you confirm exactly which posts to migrate.
 
@@ -167,18 +168,18 @@ These are the choices that shape your migration. The agent records each one in a
 
 ## Choosing your static site generator
 
-Before hosting, you pick the **static site generator (SSG)** that builds your site. Both options convert the same Medium posts, preserve the same old URLs, and work with either hosting platform — they differ mainly in tooling and how you customize the look.
+Before hosting, you pick the **static site generator (SSG)** that builds your site. All three options convert the same Medium posts, preserve the same old URLs, and work with either hosting platform — they differ mainly in tooling and how you customize the look.
 
-### Hugo vs. Eleventy at a glance
+### Hugo vs. Eleventy vs. Astro at a glance
 
-| | **Hugo** (default) | **Eleventy (11ty)** |
-|---|---|---|
-| **Toolchain** | A single Go binary | Node.js (version per the starter's `.nvmrc`) + npm |
-| **Theming** | Large gallery at <https://themes.gohugo.io> | No gallery — scaffolded from the `eleventy-base-blog` starter; you own the templates |
-| **Build** | `hugo --minify` → `public/` | `npx @11ty/eleventy` → `_site/` |
-| **Old-URL redirects** | Built in via front-matter `aliases` | A small redirects collection + template the skill adds (same end result) |
-| **Project folder** | `hugo-site/` | `eleventy-site/` |
-| **Best for** | Most users; no Node toolchain — pick a theme and go | Those who prefer a JavaScript/Node workflow and hand-owned templates |
+| | **Hugo** (default) | **Eleventy (11ty)** | **Astro** |
+|---|---|---|---|
+| **Toolchain** | A single Go binary | Node.js (per the starter's `.nvmrc`) + npm | Node.js (per the starter's `.nvmrc` / `engines`) + npm |
+| **Theming** | Large gallery at <https://themes.gohugo.io> | No gallery — scaffolded from the `eleventy-base-blog` starter; you own the templates | Has a [themes showcase](https://astro.build/themes/) (many paid, but a [free filter](https://astro.build/themes/1/?search=&price%5B%5D=free) exists) — the skill instead scaffolds the official `blog` starter, so you own the templates |
+| **Build** | `hugo --minify` → `public/` | `npx @11ty/eleventy` → `_site/` | `npm run build` → `dist/` |
+| **Old-URL redirects** | Built in via front-matter `aliases` | A small redirects collection + template the skill adds (same end result) | A small catch-all redirect route the skill adds (same end result) |
+| **Project folder** | `hugo-site/` | `eleventy-site/` | `astro-site/` |
+| **Best for** | Most users; no Node toolchain — pick a theme and go | Those who prefer a JavaScript/Node workflow and hand-owned templates | Those who want a modern, component-based JavaScript toolchain |
 
 ### Pick **Hugo** if…
 
@@ -192,13 +193,23 @@ Before hosting, you pick the **static site generator (SSG)** that builds your si
 - You prefer a **JavaScript/Node.js ecosystem** and are comfortable with npm.
 - You want to **own and hand-edit your templates** rather than configure a packaged theme.
 
-### How to choose Eleventy
+### Pick **Astro** if…
 
-Hugo is the default. To use Eleventy, just tell the agent — up front or when asked:
+- You want a **modern, component-based** JavaScript toolchain and are comfortable with npm and a recent Node.js (the starter pins the exact version).
+- You want to **own and hand-edit your templates** (the skill starts you from the official `blog` starter rather than a packaged theme, though Astro does have a [themes showcase](https://astro.build/themes/) if you'd rather adapt one).
+- You want your site to be a **showpiece**, e.g. it serves as a portfolio in addition to a blog.
+
+### How to choose Eleventy or Astro
+
+Hugo is the default. To use Eleventy or Astro, just tell the agent — up front or when asked:
 
 > "Use **Eleventy**, not Hugo. I'd rather work in a Node.js project I can customize myself."
 
-The agent records your choice in `migration-status.md`, scaffolds the `eleventy-base-blog` starter into `eleventy-site/`, and wires up a redirects template so your old Medium URLs still work. If you don't say anything, you get Hugo.
+or
+
+> "Use **Astro**, not Hugo. I want a modern component-based JavaScript site I can customize."
+
+The agent records your choice in `migration-status.md`, scaffolds the chosen starter into `eleventy-site/` or `astro-site/`, and wires up the redirects mechanism so your old Medium URLs still work. If you don't say anything, you get Hugo.
 
 ---
 
@@ -504,15 +515,16 @@ If you're curious what's under the hood:
 ├── SKILL.md                   # Main playbook the agent reads
 ├── references/                # Loaded on-demand, one per phase
 │   ├── content-migration.md
-│   ├── hugo-setup.md           # Site setup — Hugo path
-│   ├── eleventy-setup.md       # Site setup — Eleventy path
+│   ├── hugo-setup.md          # Site setup — Hugo path
+│   ├── eleventy-setup.md      # Site setup — Eleventy path
+│   ├── astro-setup.md         # Site setup — Astro path
 │   ├── terraform.md           # AWS — Terraform infrastructure path
 │   ├── aws-cli-infra.md       # AWS — AWS CLI infrastructure path (Terraform alternative)
 │   ├── github-pages.md        # GitHub Pages hosting path (AWS alternative)
 │   ├── cicd.md
 │   └── dns-cutover.md
 └── scripts/
-    └── convert_medium.py      # Medium HTML → Hugo/Eleventy Markdown converter
+    └── convert_medium.py      # Medium HTML → Hugo/Eleventy/Astro Markdown converter
 ```
 
 You generally **don't edit these** — the agent reads them. The one exception is `convert_medium.py`, which has a small config block (`SSG`, `INPUT_DIR`, `OUTPUT_DIR`, and a `posts` list mapping each Medium HTML file to a clean URL slug). The agent fills this in for you, but you can review it.

@@ -1,9 +1,9 @@
 """Regression tests for convert_medium.py (medium-to-ssg skill).
 
 Focus: the HTML->Markdown transform and the front-matter assembly, including the
-Hugo-vs-Eleventy branching. Image downloading is disabled (``DOWNLOAD_IMAGES``)
+Hugo/Eleventy/Astro branching. Image downloading is disabled (``DOWNLOAD_IMAGES``)
 so no network is touched; ``localize_image_src`` then returns the original URL.
-Each test pins behavior that was a past bug fix or is load-bearing for the two
+Each test pins behavior that was a past bug fix or is load-bearing for the three
 SSG output formats.
 """
 import os
@@ -289,6 +289,18 @@ class FigureAndImageTests(unittest.TestCase):
         )
         self.assertIn('{% video "https://youtube.com/embed/x" %}', out)
 
+    def test_figure_iframe_video_astro_raw_iframe(self):
+        # Astro Markdown has no shortcodes, so the converter emits the rendered
+        # responsive <iframe> HTML inline (raw HTML passes through Astro md).
+        out = md(
+            '<figure><iframe src="https://youtube.com/embed/x"></iframe></figure>',
+            ssg="astro",
+        )
+        self.assertIn('<iframe src="https://youtube.com/embed/x"', out)
+        self.assertIn('class="video-embed"', out)
+        self.assertNotIn("{% video", out)
+        self.assertNotIn("{{< video", out)
+
 
 class ConvertPostFrontMatterTests(unittest.TestCase):
     """End-to-end front-matter assembly, including the SSG branch."""
@@ -332,6 +344,19 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn('permalink: "/archive/my-post/"', out)
         self.assertNotIn("//my-post", out)
 
+    def test_astro_front_matter_uses_slug_and_pubdate(self):
+        # Astro derives /posts/<slug>/ from the content entry's id (the output
+        # filename), not the `slug:` field — the converter still emits `slug:`
+        # for parity with Hugo. Astro names the publish date `pubDate` (its Zod
+        # schema's field), not `date`, and never emits Eleventy's `permalink:`.
+        cm.SSG = "astro"
+        fn = write_export(self.tmp, "post.html", date_iso="2019-09-04T08:00:00.000Z")
+        out = cm.convert_post(fn, "my-post")
+        self.assertIn('slug: "my-post"', out)
+        self.assertIn("pubDate: 2019-09-04", out)
+        self.assertNotIn("\ndate:", out)
+        self.assertNotIn("permalink:", out)
+
     def test_date_comes_from_dt_published(self):
         cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", date_iso="2019-09-04T08:00:00.000Z")
@@ -351,8 +376,8 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn(fn, str(ctx.exception))
         self.assertIn("draft", str(ctx.exception).lower())
 
-    def test_alias_preserves_medium_slug_on_both_ssgs(self):
-        for ssg in ("hugo", "eleventy"):
+    def test_alias_preserves_medium_slug_on_all_ssgs(self):
+        for ssg in ("hugo", "eleventy", "astro"):
             cm.SSG = ssg
             fn = write_export(self.tmp, "post.html")
             out = cm.convert_post(fn, "my-post")
