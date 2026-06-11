@@ -1,9 +1,10 @@
 """Regression tests for convert_medium.py (medium-to-ssg skill).
 
-Focus: the HTML->Markdown transform and the front-matter assembly. Image
-downloading is disabled (``DOWNLOAD_IMAGES``) so no network is touched;
-``localize_image_src`` then returns the original URL. Each test pins behavior
-that was a past bug fix or is load-bearing for the Hugo output format.
+Focus: the HTML->Markdown transform and the front-matter assembly, including the
+Hugo-vs-Eleventy branching. Image downloading is disabled (``DOWNLOAD_IMAGES``)
+so no network is touched; ``localize_image_src`` then returns the original URL.
+Each test pins behavior that was a past bug fix or is load-bearing for the two
+SSG output formats.
 """
 import os
 import tempfile
@@ -21,14 +22,14 @@ def node(html):
     return BeautifulSoup(html, "html.parser").find()
 
 
-def md(html):
-    """Convert an HTML fragment to Markdown with image download disabled."""
-    prev_dl = cm.DOWNLOAD_IMAGES
-    cm.DOWNLOAD_IMAGES = False
+def md(html, ssg="hugo"):
+    """Convert an HTML fragment to Markdown under the given SSG, no network."""
+    prev_ssg, prev_dl = cm.SSG, cm.DOWNLOAD_IMAGES
+    cm.SSG, cm.DOWNLOAD_IMAGES = ssg, False
     try:
         return cm.node_to_md(node(html))
     finally:
-        cm.DOWNLOAD_IMAGES = prev_dl
+        cm.SSG, cm.DOWNLOAD_IMAGES = prev_ssg, prev_dl
 
 
 # Minimal export-format page that convert_post() knows how to read.
@@ -172,32 +173,65 @@ class FigureAndImageTests(unittest.TestCase):
         self.assertIn("![cat](https://img.example.com/x.png)", out)
         self.assertIn("*A cat*", out)
 
-    def test_figure_iframe_becomes_video_shortcode(self):
-        out = md('<figure><iframe src="https://youtube.com/embed/x"></iframe></figure>')
+    def test_figure_iframe_video_hugo_shortcode(self):
+        out = md(
+            '<figure><iframe src="https://youtube.com/embed/x"></iframe></figure>',
+            ssg="hugo",
+        )
         self.assertIn('{{< video src="https://youtube.com/embed/x" >}}', out)
+
+    def test_figure_iframe_video_eleventy_shortcode(self):
+        out = md(
+            '<figure><iframe src="https://youtube.com/embed/x"></iframe></figure>',
+            ssg="eleventy",
+        )
+        self.assertIn('{% video "https://youtube.com/embed/x" %}', out)
 
 
 class ConvertPostFrontMatterTests(unittest.TestCase):
-    """End-to-end front-matter assembly from a minimal export page."""
+    """End-to-end front-matter assembly, including the SSG branch."""
 
     def setUp(self):
-        self._prev = (cm.INPUT_DIR, cm.DOWNLOAD_IMAGES, cm.EXTRACT_TAGS)
+        self._prev = (cm.INPUT_DIR, cm.SSG, cm.DOWNLOAD_IMAGES,
+                      cm.EXTRACT_TAGS, cm.PERMALINK_PREFIX)
         self._tmpdir = tempfile.TemporaryDirectory()
         self.tmp = self._tmpdir.name
         cm.INPUT_DIR = self.tmp
         cm.DOWNLOAD_IMAGES = False
         cm.EXTRACT_TAGS = True
+        cm.PERMALINK_PREFIX = "/posts"
 
     def tearDown(self):
-        cm.INPUT_DIR, cm.DOWNLOAD_IMAGES, cm.EXTRACT_TAGS = self._prev
+        (cm.INPUT_DIR, cm.SSG, cm.DOWNLOAD_IMAGES,
+         cm.EXTRACT_TAGS, cm.PERMALINK_PREFIX) = self._prev
         self._tmpdir.cleanup()
 
-    def test_front_matter_uses_slug(self):
+    def test_hugo_front_matter_uses_slug(self):
+        cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html")
         out = cm.convert_post(fn, "my-post")
         self.assertIn('slug: "my-post"', out)
+        self.assertNotIn("permalink:", out)
+
+    def test_eleventy_front_matter_uses_permalink(self):
+        cm.SSG = "eleventy"
+        fn = write_export(self.tmp, "post.html")
+        out = cm.convert_post(fn, "my-post")
+        self.assertIn('permalink: "/posts/my-post/"', out)
+        self.assertNotIn("slug:", out)
+
+    def test_eleventy_permalink_prefix_trailing_slash_no_double_slash(self):
+        # A custom PERMALINK_PREFIX with a trailing slash (as the docs show,
+        # e.g. "/archive/") must not produce a doubled slash in the permalink.
+        cm.SSG = "eleventy"
+        cm.PERMALINK_PREFIX = "/archive/"
+        fn = write_export(self.tmp, "post.html")
+        out = cm.convert_post(fn, "my-post")
+        self.assertIn('permalink: "/archive/my-post/"', out)
+        self.assertNotIn("//my-post", out)
 
     def test_date_comes_from_dt_published(self):
+        cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", date_iso="2019-09-04T08:00:00.000Z")
         out = cm.convert_post(fn, "my-post")
         self.assertIn("date: 2019-09-04", out)
@@ -215,17 +249,21 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn(fn, str(ctx.exception))
         self.assertIn("draft", str(ctx.exception).lower())
 
-    def test_alias_preserves_medium_slug(self):
-        fn = write_export(self.tmp, "post.html")
-        out = cm.convert_post(fn, "my-post")
-        self.assertIn("aliases:\n  - /my-post-a1b2c3d4e5f6", out)
+    def test_alias_preserves_medium_slug_on_both_ssgs(self):
+        for ssg in ("hugo", "eleventy"):
+            cm.SSG = ssg
+            fn = write_export(self.tmp, "post.html")
+            out = cm.convert_post(fn, "my-post")
+            self.assertIn("aliases:\n  - /my-post-a1b2c3d4e5f6", out, ssg)
 
     def test_author_line_present(self):
+        cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", author="Greg Sauer")
         out = cm.convert_post(fn, "my-post")
         self.assertIn('author: "Greg Sauer"', out)
 
     def test_tags_written_when_present(self):
+        cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", tags=("Web Development", "Java"))
         out = cm.convert_post(fn, "my-post")
         self.assertIn("tags:\n", out)
@@ -233,6 +271,7 @@ class ConvertPostFrontMatterTests(unittest.TestCase):
         self.assertIn('  - "Java"', out)
 
     def test_title_with_quotes_is_escaped(self):
+        cm.SSG = "hugo"
         fn = write_export(self.tmp, "post.html", title='The "Best" Post')
         out = cm.convert_post(fn, "my-post")
         self.assertIn(r'title: "The \"Best\" Post"', out)
