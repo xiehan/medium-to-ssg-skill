@@ -204,7 +204,7 @@ The agent records your choice in `migration-status.md`, scaffolds the `eleventy-
 
 ## Choosing where to host your site
 
-This is the **first big decision**. The skill needs to know where your site will live. Both options give you the same Hugo site, the same posts, and the same preserved Medium URLs — they differ in cost, simplicity, and how much control you have.
+This is the **first big decision**. The skill needs to know where your site will live. Both options give you the same site, the same posts, and the same preserved Medium URLs — they differ in cost, simplicity, and how much control you have.
 
 ### At a glance
 
@@ -239,7 +239,7 @@ AWS is the default. To use GitHub Pages, just tell the agent — up front or whe
 
 The agent records your choice in `migration-status.md`, skips all the AWS/Terraform steps, and generates a GitHub Pages deploy workflow plus a `CNAME` file instead. If you don't say anything, you get AWS.
 
-> Changed your mind later? You can switch hosts after the fact — your Hugo site, posts, and URL aliases are reused unchanged; only the hosting layer moves. Tell the agent, e.g. "Switch my site from GitHub Pages to AWS."
+> Changed your mind later? You can switch hosts after the fact — your site, posts, and URL aliases are reused unchanged; only the hosting layer moves. Tell the agent, e.g. "Switch my site from GitHub Pages to AWS."
 
 ---
 
@@ -533,10 +533,10 @@ You generally **don't edit these** — the agent reads them. The one exception i
 
 ## Troubleshooting
 
-- **The agent didn't pick up the skill.** Make sure you opened the workspace that contains `.agents/skills/`, and phrase your request around Medium/Hugo/AWS/self-hosting. You can also say: "Use the medium-to-ssg skill."
+- **The agent didn't pick up the skill.** Make sure you opened the workspace that contains `.agents/skills/`, and phrase your request around Medium/Hugo/Eleventy/AWS/self-hosting. You can also say: "Use the medium-to-ssg skill."
 - **It wants a theme and won't continue.** That's intentional on the **Hugo** path — provide a theme name *and* its GitHub URL from <https://themes.gohugo.io/tags/blog/>. (On the **Eleventy** path there's no theme to pick; it uses the `eleventy-base-blog` starter.)
 - **Old Medium links break.** Confirm the converted posts kept their `aliases` front matter; those generate the redirect pages. (Aliases work on both AWS and GitHub Pages.)
 - **HTTPS/cert validation is stuck (AWS).** ACM validation only completes after you update your nameservers to the Route 53 ones the skill outputs — that's the two-phase provisioning step.
 - **HTTPS isn't available yet (GitHub Pages).** GitHub provisions the certificate only after it verifies your custom domain via DNS; this can take a few minutes up to ~24 hours. Then enable "Enforce HTTPS" in the repo's Pages settings. On Cloudflare, set the records to "DNS only" (grey cloud) until the certificate is issued.
 - **You don't want to install Terraform.** Tell the agent to use the **AWS CLI method** ("Use the AWS CLI method, not Terraform"), or skip AWS entirely with **GitHub Pages**.
-- **You don't want an AWS account at all.** Choose **GitHub Pages** ("Host this on GitHub Pages, not AWS"). It needs only Hugo, Git, and Python — no AWS, no Terraform.
+- **You don't want an AWS account at all.** Choose **GitHub Pages** ("Host this on GitHub Pages, not AWS"). It needs only your SSG's tool (Hugo or Node.js), Git, and Python — no AWS, no Terraform.

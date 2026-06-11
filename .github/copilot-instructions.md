@@ -2,9 +2,9 @@
 
 ## What this repository is
 
-This repo is **not an application** — it is a collection of **agent skills**: structured Markdown instructions (plus a few helper scripts) that teach an AI coding agent how to migrate a Medium blog to a self-hosted Hugo static site.
+This repo is **not an application** — it is a collection of **agent skills**: structured Markdown instructions (plus a few helper scripts) that teach an AI coding agent how to migrate a Medium blog to a self-hosted static site built with Hugo (the default) or Eleventy.
 
-- `.agents/skills/medium-to-ssg/` — migrate a Medium export → Hugo site on **AWS** or **GitHub Pages**.
+- `.agents/skills/medium-to-ssg/` — migrate a Medium export → Hugo or Eleventy site on **AWS** or **GitHub Pages**.
 - `.agents/skills/medium-publication-export/` — scrape a multi-author publication → a Medium-export-compatible ZIP that feeds the skill above.
 - Each skill has a `SKILL.md` (entry point, with YAML frontmatter) and `references/*.md` (phase-by-phase deep guidance the agent reads on demand).
 - `tools/lint_skills.py` is a zero-dependency structural linter run in CI.
@@ -17,6 +17,7 @@ When reviewing, evaluate the docs as **instructions an AI agent will follow end 
 
 The skills offer several either/or choices. A change to one branch usually requires matching updates elsewhere, and an agent following any single path must never hit a dead end, a missing file, or guidance meant for a different branch. For every PR, trace each path end to end and confirm it stays internally consistent:
 
+- **Static site generator (SSG):** Hugo (default) **vs** Eleventy. The converter (`convert_medium.py` via its `SSG` setting) and every hosting/deploy reference branch on this — front matter, build command (`hugo --minify` vs the starter's Eleventy build), and output directory (`public/` vs `_site/`) all differ. A change to one SSG's setup usually needs the matching update on the other (see `references/hugo-setup.md` vs `references/eleventy-setup.md`).
 - **Hosting platform:** AWS (S3 + CloudFront) **vs** GitHub Pages.
 - **AWS infrastructure method:** Terraform **vs** AWS CLI shell scripts (both must create the *same* resources).
 - **Terraform state backend:** local (default — **no** `terraform.yml` CI workflow is generated) **vs** remote S3/HCP (a `terraform.yml` workflow **is** generated). Watch for instructions that assume one but apply to the other.
