@@ -24,6 +24,8 @@ Not sure which to pick? See [Choosing where to host your site](#choosing-where-t
 
 You don't run a single big script. Instead, you **talk to an AI agent**, and the skill gives that agent a detailed, phase-by-phase playbook so it produces consistent, correct output and never skips a step.
 
+This skill is intentionally verbose and prescriptive because that means it will work well even with lower-capability AI agents, e.g. Claude Sonnet 4.6 Low on the Free tier. You may not be able to perform the full migration end-to-end without hitting token limits and needing to wait a few hours for these to reset, but the skill keeps track of its progress so that it can seamlessly pick back up where it left off if it gets interrupted; see [Built-in recovery (important for free-tier AI users)](#built-in-recovery-important-for-free-tier-ai-users) for details.
+
 ---
 
 ## What is an "agent skill"?
@@ -34,7 +36,7 @@ If you're new to skills, here's the short version:
 - The agent **automatically loads the skill** when your request matches what the skill is for. You don't call it like a command — you just describe what you want in plain English.
 - The main file the agent reads is [`.agents/skills/medium-to-ssg/SKILL.md`](.agents/skills/medium-to-ssg/SKILL.md). It tells the agent its role, the inputs to collect, and the 7 phases to follow.
 
-You interact with the skill simply by **chatting with your agent** in a workspace where this skill is available.
+You interact with the skill simply by **chatting with your agent** in a workspace where this skill is available. See [Example prompts for common situations](#example-prompts-for-common-situations) for different ways to trigger the skill and customize its output.
 
 ---
 
